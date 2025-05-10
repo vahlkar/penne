@@ -1,7 +1,7 @@
 {
-  "name": "react-hello-world",
+  "name": "pentest-clippy",
   "version": "0.1.0-alpha.1",
-  "description": "A simple React Hello World application",
+  "description": "A penetration testing reporting tool as a frontend-only single page application.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,6 +10,11 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@chakra-ui/icons": "^2.2.4",
+    "@chakra-ui/react": "^2.8.2",
+    "@emotion/react": "^11.11.3",
+    "@emotion/styled": "^11.11.0",
+    "framer-motion": "^10.18.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.21.1"
@@ -21,4 +26,4 @@
     "typescript": "^5.2.2",
     "vite": "^5.0.12"
   }
-} 
+}

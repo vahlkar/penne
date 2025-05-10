@@ -1,21 +1,23 @@
 import React from 'react';
+import { Container, Heading, Text, List, ListItem, VStack } from '@chakra-ui/react';
 
 const About: React.FC = () => {
   return (
-    <div style={{
-      padding: '2rem',
-      maxWidth: '800px',
-      margin: '0 auto'
-    }}>
-      <h1>About This App</h1>
-      <p>This is a sample React application demonstrating routing capabilities.</p>
-      <p>Features:</p>
-      <ul>
-        <li>React with TypeScript</li>
-        <li>Vite for fast development</li>
-        <li>React Router for navigation</li>
-      </ul>
-    </div>
+    <Container maxW="container.md" py={8}>
+      <VStack spacing={6} align="stretch">
+        <Heading>About This App</Heading>
+        <Text fontSize="lg">
+          This is a sample React application demonstrating routing capabilities.
+        </Text>
+        <Text fontSize="lg" fontWeight="bold">Features:</Text>
+        <List spacing={3}>
+          <ListItem>React with TypeScript</ListItem>
+          <ListItem>Vite for fast development</ListItem>
+          <ListItem>React Router for navigation</ListItem>
+          <ListItem>Chakra UI for beautiful components</ListItem>
+        </List>
+      </VStack>
+    </Container>
   );
 };
 
