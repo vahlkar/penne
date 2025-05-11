@@ -6,6 +6,7 @@ import About from './components/About';
 import Reports from './components/Reports';
 import Vulnerabilities from './components/Vulnerabilities';
 import Configuration from './components/Configuration';
+import ReportDetail from './components/ReportDetail';
 import theme from './theme';
 
 const App: React.FC = () => {
@@ -20,6 +21,7 @@ const App: React.FC = () => {
             <Route path="/about" element={<About />} />
             <Route path="/vulnerabilities" element={<Vulnerabilities />} />
             <Route path="/configuration" element={<Configuration />} />
+            <Route path="/report/:id" element={<ReportDetail />} />
           </Routes>
         </Box>
       </HashRouter>

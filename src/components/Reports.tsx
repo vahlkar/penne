@@ -20,11 +20,13 @@ import {
   useToast,
 } from '@chakra-ui/react';
 import { SearchIcon, AddIcon, EditIcon, DownloadIcon, DeleteIcon, ChevronUpIcon, ChevronDownIcon } from '@chakra-ui/icons';
+import { useNavigate } from 'react-router-dom';
 import NewReportModal from './NewReportModal';
 import DeleteConfirmationDialog from './DeleteConfirmationDialog';
 import { Report, initDB, addReport, getAllReports, deleteReport } from '../utils/db';
 
 const Reports: React.FC = () => {
+  const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
   const [reportToDelete, setReportToDelete] = useState<Report | null>(null);
@@ -103,6 +105,10 @@ const Reports: React.FC = () => {
     } finally {
       setReportToDelete(null);
     }
+  };
+
+  const handleEditClick = (reportId: string) => {
+    navigate(`/report/${reportId}`);
   };
 
   return (
@@ -194,6 +200,7 @@ const Reports: React.FC = () => {
                       icon={<EditIcon />}
                       size="sm"
                       variant="ghost"
+                      onClick={() => handleEditClick(report.id)}
                     />
                     <IconButton
                       aria-label="Download report"
