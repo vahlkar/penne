@@ -28,7 +28,7 @@ import {
   Icon,
 } from '@chakra-ui/react';
 import { Finding } from '../../utils/db';
-import { FiChevronDown, FiChevronRight } from 'react-icons/fi';
+import { FiChevronDown, FiChevronRight, FiSave, FiTrash2, FiEdit } from 'react-icons/fi';
 
 interface FindingDetailProps {
   findingId: string | null;
@@ -130,6 +130,29 @@ const FindingDetail: React.FC<FindingDetailProps> = ({
     });
   };
 
+  const handleSave = async () => {
+    if (!formData) return;
+
+    try {
+      await onSave(formData);
+      toast({
+        title: "Finding saved",
+        status: "success",
+        duration: 2000,
+        isClosable: true,
+      });
+      onDirtyChange(false);
+    } catch (error) {
+      toast({
+        title: "Error saving finding",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
   if (!formData) {
     return null;
   }
@@ -158,6 +181,31 @@ const FindingDetail: React.FC<FindingDetailProps> = ({
               <option value="API">API</option>
             </Select>
           </FormControl>
+        </HStack>
+        <HStack spacing={2}>
+          <Button
+            leftIcon={<FiEdit />}
+            colorScheme="blue"
+            variant="outline"
+            onClick={() => {/* TODO: Implement propose update */}}
+          >
+            Propose Update
+          </Button>
+          <Button
+            leftIcon={<FiSave />}
+            colorScheme="blue"
+            onClick={handleSave}
+          >
+            Save
+          </Button>
+          <Button
+            leftIcon={<FiTrash2 />}
+            colorScheme="red"
+            variant="outline"
+            onClick={() => findingId && onDelete(findingId)}
+          >
+            Delete
+          </Button>
         </HStack>
       </Flex>
 

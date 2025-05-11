@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, Routes, Route, Link } from 'react-router-dom';
 import {
   Box,
   VStack,
@@ -17,27 +18,23 @@ import {
   AlertDialogHeader,
   AlertDialogContent,
   AlertDialogOverlay,
+  useDisclosure,
 } from '@chakra-ui/react';
 import { FiSave, FiPlus, FiTrash2 } from 'react-icons/fi';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Report, Finding, getReport, updateReport, getFindingsByReport, addFinding, deleteFinding, updateFinding } from '../utils/db';
 import GeneralInformation from './report/GeneralInformation';
 import FindingDetail from './report/FindingDetail';
 import FindingSort from './report/FindingSort';
-import { Report, Finding, getReport, updateReport, getFindingsByReport, addFinding, deleteFinding, updateFinding } from '../utils/db';
 
 const ReportDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const toast = useToast();
   const [report, setReport] = useState<Report | null>(null);
-  const [activeSection, setActiveSection] = useState<'general' | 'finding'>('general');
-  const [selectedFinding, setSelectedFinding] = useState<string | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
-  const [sortBy, setSortBy] = useState('cvss');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [autoSort, setAutoSort] = useState(false);
+  const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
-  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const { isOpen: isDeleteAlertOpen, onOpen: onDeleteAlertOpen, onClose: onDeleteAlertClose } = useDisclosure();
   const cancelRef = React.useRef<HTMLButtonElement>(null);
 
   const bgColor = useColorModeValue('white', 'gray.800');
@@ -105,11 +102,16 @@ const ReportDetail: React.FC = () => {
     }
   };
 
-  const handleSaveFinding = async (updatedFinding: Finding) => {
+  const handleSaveFinding = async (finding: Finding) => {
     try {
-      await updateFinding(updatedFinding);
-      setFindings(prev => prev.map(f => f.id === updatedFinding.id ? updatedFinding : f));
-      setIsDirty(false);
+      if (finding.id) {
+        await updateFinding(finding);
+        setFindings(prev => prev.map(f => f.id === finding.id ? finding : f));
+      } else {
+        const newFinding = await addFinding(finding);
+        setFindings(prev => [...prev, newFinding]);
+        navigate(`/report/${id}/finding/${newFinding.id}`);
+      }
       toast({
         title: 'Success',
         description: 'Finding saved successfully',
@@ -117,6 +119,7 @@ const ReportDetail: React.FC = () => {
         duration: 3000,
         isClosable: true,
       });
+      setIsDirty(false);
     } catch (error) {
       console.error('Failed to save finding:', error);
       toast({
@@ -129,60 +132,13 @@ const ReportDetail: React.FC = () => {
     }
   };
 
-  const handleAddFinding = async () => {
-    if (!id) return;
-    try {
-      const newFinding = await addFinding({
-        reportId: id,
-        title: 'New Finding',
-        type: 'Web',
-        cvssScore: 0,
-        description: '',
-        recommendation: '',
-        references: '',
-        affectedAssets: '',
-        stepsToReproduce: '',
-        cvssVector: {
-          attackVector: 'network',
-          scope: 'unchanged',
-          attackComplexity: 'low',
-          privilegesRequired: 'none',
-          userInteraction: 'none',
-          confidentialityImpact: 'none',
-          integrityImpact: 'none',
-          availabilityImpact: 'none',
-        },
-        isCompleted: false,
-      });
-      setFindings(prev => [...prev, newFinding]);
-      setSelectedFinding(newFinding.id);
-      setActiveSection('finding');
-      toast({
-        title: 'Success',
-        description: 'New finding added',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-    } catch (error) {
-      console.error('Failed to add finding:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to add finding',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    }
-  };
-
   const handleDeleteFinding = async (findingId: string) => {
     try {
       await deleteFinding(findingId);
       setFindings(prev => prev.filter(f => f.id !== findingId));
-      if (selectedFinding === findingId) {
-        setSelectedFinding(null);
-        setActiveSection('general');
+      if (selectedFindingId === findingId) {
+        setSelectedFindingId(null);
+        navigate(`/report/${id}`);
       }
       toast({
         title: 'Success',
@@ -203,25 +159,48 @@ const ReportDetail: React.FC = () => {
     }
   };
 
-  const handleSave = async () => {
-    if (activeSection === 'general' && report) {
-      await handleSaveReport(report);
-    } else if (activeSection === 'finding' && selectedFinding) {
-      const finding = findings.find(f => f.id === selectedFinding);
-      if (finding) {
-        await handleSaveFinding(finding);
-      }
-    }
-  };
-
-  const handleDeleteClick = () => {
-    setIsDeleteAlertOpen(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (selectedFinding) {
-      await handleDeleteFinding(selectedFinding);
-      setIsDeleteAlertOpen(false);
+  const handleNewFinding = async () => {
+    if (!id) return;
+    const newFinding: Omit<Finding, 'id'> = {
+      reportId: id,
+      title: '',
+      type: 'Web',
+      cvssScore: 0,
+      description: '',
+      recommendation: '',
+      references: '',
+      affectedAssets: '',
+      stepsToReproduce: '',
+      cvssVector: {
+        attackVector: 'network',
+        scope: 'unchanged',
+        attackComplexity: 'low',
+        privilegesRequired: 'none',
+        userInteraction: 'none',
+        confidentialityImpact: 'none',
+        integrityImpact: 'none',
+        availabilityImpact: 'none',
+        exploitCodeMaturity: 'not-defined',
+        remediationLevel: 'not-defined',
+        reportConfidence: 'not-defined',
+        confidentialityRequirement: 'not-defined',
+        integrityRequirement: 'not-defined',
+        availabilityRequirement: 'not-defined',
+      },
+      isCompleted: false,
+    };
+    try {
+      const savedFinding = await addFinding(newFinding);
+      setFindings(prev => [...prev, savedFinding]);
+      navigate(`/report/${id}/finding/${savedFinding.id}`);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to create new finding',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
 
@@ -242,9 +221,9 @@ const ReportDetail: React.FC = () => {
         >
           <VStack align="stretch" spacing={4}>
             <Button
-              variant={activeSection === 'general' ? 'solid' : 'ghost'}
+              variant={selectedFindingId ? 'solid' : 'ghost'}
               justifyContent="flex-start"
-              onClick={() => setActiveSection('general')}
+              onClick={() => setSelectedFindingId(null)}
             >
               General Information
             </Button>
@@ -255,19 +234,15 @@ const ReportDetail: React.FC = () => {
                 </Text>
                 <HStack>
                   <FindingSort
-                    sortBy={sortBy}
-                    setSortBy={setSortBy}
-                    sortDirection={sortDirection}
-                    setSortDirection={setSortDirection}
-                    autoSort={autoSort}
-                    setAutoSort={setAutoSort}
+                    findings={findings}
+                    onSort={setFindings}
                   />
                   <IconButton
                     aria-label="Add finding"
                     icon={<FiPlus />}
                     size="sm"
                     variant="ghost"
-                    onClick={handleAddFinding}
+                    onClick={handleNewFinding}
                   />
                 </HStack>
               </HStack>
@@ -275,11 +250,10 @@ const ReportDetail: React.FC = () => {
                 {findings.map((finding) => (
                   <Button
                     key={finding.id}
-                    variant={selectedFinding === finding.id ? 'solid' : 'ghost'}
+                    variant={selectedFindingId === finding.id ? 'solid' : 'ghost'}
                     justifyContent="flex-start"
                     onClick={() => {
-                      setSelectedFinding(finding.id);
-                      setActiveSection('finding');
+                      setSelectedFindingId(finding.id);
                     }}
                   >
                     <Flex justify="space-between" w="100%" align="center">
@@ -295,77 +269,55 @@ const ReportDetail: React.FC = () => {
 
         {/* Main Content */}
         <Box flex="1" p={6} overflowY="auto">
-          <Flex justify="flex-end" mb={4}>
-            <HStack spacing={4}>
-              {activeSection === 'finding' && (
-                <>
-                  <Button colorScheme="orange">
-                    Propose Creation/Update
-                  </Button>
-                  <Button
-                    leftIcon={<Icon as={FiTrash2} />}
-                    colorScheme="red"
-                    onClick={handleDeleteClick}
-                  >
-                    Delete
-                  </Button>
-                </>
-              )}
-              <Button
-                leftIcon={<Icon as={FiSave} />}
-                colorScheme="blue"
-                size="md"
-                onClick={handleSave}
-                isDisabled={!isDirty}
-              >
-                Save (ctrl+s)
-              </Button>
-            </HStack>
-          </Flex>
-          
-          {/* Add AlertDialog for delete confirmation */}
-          <AlertDialog
-            isOpen={isDeleteAlertOpen}
-            leastDestructiveRef={cancelRef}
-            onClose={() => setIsDeleteAlertOpen(false)}
-          >
-            <AlertDialogOverlay>
-              <AlertDialogContent>
-                <AlertDialogHeader fontSize="lg" fontWeight="bold">
-                  Delete Finding
-                </AlertDialogHeader>
-
-                <AlertDialogBody>
-                  Are you sure you want to delete this finding? This action cannot be undone.
-                </AlertDialogBody>
-
-                <AlertDialogFooter>
-                  <Button ref={cancelRef} onClick={() => setIsDeleteAlertOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button colorScheme="red" onClick={handleDeleteConfirm} ml={3}>
-                    Delete
-                  </Button>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialogOverlay>
-          </AlertDialog>
-          
-          {activeSection === 'general' ? (
-            <GeneralInformation 
-              report={report} 
-              onSave={handleSaveReport}
-              onDirtyChange={setIsDirty}
-            />
-          ) : (
-            <FindingDetail
-              findingId={selectedFinding}
-              finding={findings.find(f => f.id === selectedFinding)}
-              onDelete={handleDeleteFinding}
-              onSave={handleSaveFinding}
-              onDirtyChange={setIsDirty}
-            />
-          )}
+          <Routes>
+            <Route path="/" element={
+              <>
+                <GeneralInformation 
+                  report={report} 
+                  onSave={handleSaveReport}
+                  onDirtyChange={setIsDirty}
+                />
+                <Box>
+                  <Flex justify="space-between" align="center" mb={4}>
+                    <Text fontSize="xl" fontWeight="bold">Findings</Text>
+                    <HStack>
+                      <FindingSort findings={findings} onSort={setFindings} />
+                      <IconButton
+                        aria-label="Add finding"
+                        icon={<FiPlus />}
+                        onClick={handleNewFinding}
+                      />
+                    </HStack>
+                  </Flex>
+                  <VStack spacing={2} align="stretch">
+                    {findings.map(finding => (
+                      <Link key={finding.id} to={`/report/${id}/finding/${finding.id}`}>
+                        <Box
+                          p={4}
+                          borderWidth={1}
+                          borderRadius="md"
+                          _hover={{ bg: 'gray.50' }}
+                        >
+                          <Text fontWeight="bold">{finding.title}</Text>
+                          <Text color="gray.600">Type: {finding.type}</Text>
+                          <Text color="gray.600">CVSS Score: {finding.cvssScore}</Text>
+                        </Box>
+                      </Link>
+                    ))}
+                  </VStack>
+                </Box>
+              </>
+            } />
+            <Route path="/finding/:findingId" element={
+              <FindingDetail
+                findingId={selectedFindingId}
+                finding={findings.find(f => f.id === selectedFindingId)}
+                onDelete={handleDeleteFinding}
+                onSave={handleSaveFinding}
+                onDirtyChange={setIsDirty}
+              />
+            } />
+          </Routes>
         </Box>
       </Flex>
     </Box>

@@ -1,30 +1,27 @@
 import React from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
-import { ChakraProvider, Box, ColorModeScript } from '@chakra-ui/react';
-import Header from './components/Header';
-import About from './components/About';
+import { ChakraProvider, CSSReset } from '@chakra-ui/react';
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import Reports from './components/Reports';
+import ReportDetail from './components/ReportDetail';
+import Header from './components/Header';
 import Vulnerabilities from './components/Vulnerabilities';
 import Configuration from './components/Configuration';
-import ReportDetail from './components/ReportDetail';
-import theme from './theme';
+import About from './components/About';
 
 const App: React.FC = () => {
   return (
-    <ChakraProvider theme={theme}>
-      <ColorModeScript initialColorMode={theme.config.initialColorMode} />
-      <HashRouter>
-        <Box minH="100vh" bg="gray.50" _dark={{ bg: 'gray.900' }}>
-          <Header />
-          <Routes>
-            <Route path="/" element={<Reports />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/vulnerabilities" element={<Vulnerabilities />} />
-            <Route path="/configuration" element={<Configuration />} />
-            <Route path="/report/:id" element={<ReportDetail />} />
-          </Routes>
-        </Box>
-      </HashRouter>
+    <ChakraProvider>
+      <CSSReset />
+      <Router>
+        <Header />
+        <Routes>
+          <Route path="/" element={<Reports />} />
+          <Route path="/report/:id/*" element={<ReportDetail />} />
+          <Route path="/vulnerabilities" element={<Vulnerabilities />} />
+          <Route path="/configuration" element={<Configuration />} />
+          <Route path="/about" element={<About />} />
+        </Routes>
+      </Router>
     </ChakraProvider>
   );
 };
