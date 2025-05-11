@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Box,
@@ -17,12 +17,94 @@ import {
   Select,
   Text,
   HStack,
-  InputRightElement,
-  Icon,
+  useToast,
 } from '@chakra-ui/react';
 import { SearchIcon, AddIcon, EditIcon, DownloadIcon, DeleteIcon, ChevronUpIcon, ChevronDownIcon } from '@chakra-ui/icons';
+import NewReportModal from './NewReportModal';
+import DeleteConfirmationDialog from './DeleteConfirmationDialog';
+import { Report, initDB, addReport, getAllReports, deleteReport } from '../utils/db';
 
 const Reports: React.FC = () => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [reports, setReports] = useState<Report[]>([]);
+  const [reportToDelete, setReportToDelete] = useState<Report | null>(null);
+  const toast = useToast();
+
+  useEffect(() => {
+    const setupDB = async () => {
+      try {
+        await initDB();
+        const allReports = await getAllReports();
+        setReports(allReports);
+      } catch (error) {
+        console.error('Failed to initialize database:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load reports',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    };
+
+    setupDB();
+  }, [toast]);
+
+  const handleNewReport = async (data: { name: string; assessmentType: string; tester: string }) => {
+    try {
+      const newReport = await addReport(data);
+      setReports((prev) => [...prev, newReport]);
+      toast({
+        title: 'Success',
+        description: 'New report created successfully',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Failed to create report:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create report',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleDeleteClick = (report: Report) => {
+    setReportToDelete(report);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!reportToDelete) return;
+
+    try {
+      await deleteReport(reportToDelete.id);
+      setReports((prev) => prev.filter((report) => report.id !== reportToDelete.id));
+      toast({
+        title: 'Success',
+        description: 'Report deleted successfully',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Failed to delete report:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete report',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setReportToDelete(null);
+    }
+  };
+
   return (
     <Container maxW="container.xl" pt={20}>
       {/* Top Bar */}
@@ -33,7 +115,7 @@ const Reports: React.FC = () => {
           </InputLeftElement>
           <Input placeholder="Search reports..." />
         </InputGroup>
-        <Button leftIcon={<AddIcon />} colorScheme="green">
+        <Button leftIcon={<AddIcon />} colorScheme="green" onClick={() => setIsModalOpen(true)}>
           New Penetration Test
         </Button>
       </Flex>
@@ -99,43 +181,45 @@ const Reports: React.FC = () => {
             </Tr>
           </Thead>
           <Tbody>
-            <Tr>
-              <Td>Sample Report 1</Td>
-              <Td>Web Application</Td>
-              <Td>John Doe</Td>
-              <Td>2024-01-15</Td>
-              <Td>
-                <HStack spacing={2}>
-                  <IconButton
-                    aria-label="Edit report"
-                    icon={<EditIcon />}
-                    size="sm"
-                    variant="ghost"
-                  />
-                  <IconButton
-                    aria-label="Download report"
-                    icon={<DownloadIcon />}
-                    size="sm"
-                    variant="ghost"
-                  />
-                  <IconButton
-                    aria-label="Delete report"
-                    icon={<DeleteIcon />}
-                    size="sm"
-                    variant="ghost"
-                    colorScheme="red"
-                  />
-                </HStack>
-              </Td>
-            </Tr>
-            {/* Add more rows as needed */}
+            {reports.map((report) => (
+              <Tr key={report.id}>
+                <Td>{report.name}</Td>
+                <Td>{report.assessmentType}</Td>
+                <Td>{report.tester}</Td>
+                <Td>{report.date}</Td>
+                <Td>
+                  <HStack spacing={2}>
+                    <IconButton
+                      aria-label="Edit report"
+                      icon={<EditIcon />}
+                      size="sm"
+                      variant="ghost"
+                    />
+                    <IconButton
+                      aria-label="Download report"
+                      icon={<DownloadIcon />}
+                      size="sm"
+                      variant="ghost"
+                    />
+                    <IconButton
+                      aria-label="Delete report"
+                      icon={<DeleteIcon />}
+                      size="sm"
+                      variant="ghost"
+                      colorScheme="red"
+                      onClick={() => handleDeleteClick(report)}
+                    />
+                  </HStack>
+                </Td>
+              </Tr>
+            ))}
           </Tbody>
         </Table>
       </Box>
 
       {/* Footer */}
       <Flex justify="space-between" align="center" mt={4}>
-        <Text>Showing 1-1 of 1 entries</Text>
+        <Text>Showing {reports.length} of {reports.length} entries</Text>
         <HStack spacing={4}>
           <Text>Results per page:</Text>
           <Select w="70px" size="sm">
@@ -162,6 +246,19 @@ const Reports: React.FC = () => {
           </HStack>
         </HStack>
       </Flex>
+
+      <NewReportModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleNewReport}
+      />
+
+      <DeleteConfirmationDialog
+        isOpen={!!reportToDelete}
+        onClose={() => setReportToDelete(null)}
+        onConfirm={handleDeleteConfirm}
+        reportName={reportToDelete?.name || ''}
+      />
     </Container>
   );
 };
