@@ -35,8 +35,10 @@ const ReportDetail: React.FC = () => {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+  const [currentFormData, setCurrentFormData] = useState<Finding | Report | null>(null);
   const { isOpen: isDeleteAlertOpen, onOpen: onDeleteAlertOpen, onClose: onDeleteAlertClose } = useDisclosure();
-  const { isOpen: isNewFindingAlertOpen, onOpen: onNewFindingAlertOpen, onClose: onNewFindingAlertClose } = useDisclosure();
+  const { isOpen: isUnsavedChangesOpen, onOpen: onUnsavedChangesOpen, onClose: onUnsavedChangesClose } = useDisclosure();
+  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
   const cancelRef = React.useRef<HTMLButtonElement>(null);
 
   const bgColor = useColorModeValue('white', 'gray.800');
@@ -161,54 +163,44 @@ const ReportDetail: React.FC = () => {
     }
   };
 
-  const handleNewFinding = async () => {
+  const handleNavigation = (navigationAction: () => void) => {
     if (isDirty) {
-      onNewFindingAlertOpen();
+      setPendingNavigation(() => navigationAction);
+      onUnsavedChangesOpen();
     } else {
-      await createNewFinding();
+      navigationAction();
     }
   };
 
-  const createNewFinding = async () => {
-    if (!id) return;
-    const newFinding: Omit<Finding, 'id'> = {
-      reportId: id,
-      title: '',
-      type: 'Web',
-      cvssScore: 0,
-      description: '',
-      recommendation: '',
-      references: '',
-      affectedAssets: '',
-      stepsToReproduce: '',
-      cvssVector: {
-        attackVector: 'network',
-        scope: 'unchanged',
-        attackComplexity: 'low',
-        privilegesRequired: 'none',
-        userInteraction: 'none',
-        confidentialityImpact: 'none',
-        integrityImpact: 'none',
-        availabilityImpact: 'none',
-        exploitCodeMaturity: 'not-defined',
-        remediationLevel: 'not-defined',
-        reportConfidence: 'not-defined',
-        confidentialityRequirement: 'not-defined',
-        integrityRequirement: 'not-defined',
-        availabilityRequirement: 'not-defined',
-      },
-      isCompleted: false,
-    };
+  const handleConfirmNavigation = () => {
+    if (pendingNavigation) {
+      setIsDirty(false);
+      pendingNavigation();
+      setPendingNavigation(null);
+    }
+    onUnsavedChangesClose();
+  };
+
+  const handleCancelNavigation = () => {
+    setPendingNavigation(null);
+    onUnsavedChangesClose();
+  };
+
+  const handleSaveAndNavigate = async () => {
+    if (!currentFormData) return;
+
     try {
-      const savedFinding = await addFinding(newFinding);
-      setFindings(prev => [...prev, savedFinding]);
-      setSelectedFindingId(savedFinding.id);
-      navigate(`/report/${id}/finding/${savedFinding.id}`);
-      onNewFindingAlertClose();
+      if (selectedFindingId) {
+        await handleSaveFinding(currentFormData as Finding);
+      } else if (report) {
+        await handleSaveReport(currentFormData as Report);
+      }
+      handleConfirmNavigation();
     } catch (error) {
+      console.error('Failed to save:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create new finding',
+        description: 'Failed to save changes',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -216,14 +208,68 @@ const ReportDetail: React.FC = () => {
     }
   };
 
+  const handleNewFinding = () => {
+    handleNavigation(async () => {
+      if (!id) return;
+      const newFinding: Omit<Finding, 'id'> = {
+        reportId: id,
+        title: '',
+        type: 'Web',
+        cvssScore: 0,
+        description: '',
+        recommendation: '',
+        references: '',
+        affectedAssets: '',
+        stepsToReproduce: '',
+        cvssVector: {
+          attackVector: 'network',
+          scope: 'unchanged',
+          attackComplexity: 'low',
+          privilegesRequired: 'none',
+          userInteraction: 'none',
+          confidentialityImpact: 'none',
+          integrityImpact: 'none',
+          availabilityImpact: 'none',
+          exploitCodeMaturity: 'not-defined',
+          remediationLevel: 'not-defined',
+          reportConfidence: 'not-defined',
+          confidentialityRequirement: 'not-defined',
+          integrityRequirement: 'not-defined',
+          availabilityRequirement: 'not-defined',
+        },
+        isCompleted: false,
+      };
+      try {
+        const savedFinding = await addFinding(newFinding);
+        setFindings(prev => [...prev, savedFinding]);
+        setSelectedFindingId(savedFinding.id);
+        navigate(`/report/${id}/finding/${savedFinding.id}`);
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: 'Failed to create new finding',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    });
+  };
+
   const handleFindingClick = (findingId: string) => {
-    setSelectedFindingId(findingId);
-    navigate(`/report/${id}/finding/${findingId}`);
+    if (selectedFindingId === findingId) return;
+    handleNavigation(() => {
+      setSelectedFindingId(findingId);
+      navigate(`/report/${id}/finding/${findingId}`);
+    });
   };
 
   const handleGeneralInfoClick = () => {
-    setSelectedFindingId(null);
-    navigate(`/report/${id}`);
+    if (!selectedFindingId) return;
+    handleNavigation(() => {
+      setSelectedFindingId(null);
+      navigate(`/report/${id}`);
+    });
   };
 
   if (!report) {
@@ -295,6 +341,7 @@ const ReportDetail: React.FC = () => {
                 report={report} 
                 onSave={handleSaveReport}
                 onDirtyChange={setIsDirty}
+                onFormDataChange={setCurrentFormData}
               />
             } />
             <Route path="/finding/:findingId" element={
@@ -304,17 +351,18 @@ const ReportDetail: React.FC = () => {
                 onDelete={handleDeleteFinding}
                 onSave={handleSaveFinding}
                 onDirtyChange={setIsDirty}
+                onFormDataChange={setCurrentFormData}
               />
             } />
           </Routes>
         </Box>
       </Flex>
 
-      {/* New Finding Alert Dialog */}
+      {/* Unsaved Changes Alert Dialog */}
       <AlertDialog
-        isOpen={isNewFindingAlertOpen}
+        isOpen={isUnsavedChangesOpen}
         leastDestructiveRef={cancelRef}
-        onClose={onNewFindingAlertClose}
+        onClose={handleCancelNavigation}
       >
         <AlertDialogOverlay>
           <AlertDialogContent>
@@ -323,15 +371,26 @@ const ReportDetail: React.FC = () => {
             </AlertDialogHeader>
 
             <AlertDialogBody>
-              You have unsaved changes. Would you like to save them before creating a new finding?
+              You have unsaved changes. Would you like to save them before continuing?
             </AlertDialogBody>
 
             <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={onNewFindingAlertClose}>
+              <Button ref={cancelRef} onClick={handleCancelNavigation}>
                 Cancel
               </Button>
-              <Button colorScheme="blue" onClick={createNewFinding} ml={3}>
-                Create New Finding
+              <Button
+                colorScheme="red"
+                onClick={handleConfirmNavigation}
+                ml={3}
+              >
+                Discard Changes
+              </Button>
+              <Button
+                colorScheme="blue"
+                onClick={handleSaveAndNavigate}
+                ml={3}
+              >
+                Save & Continue
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>

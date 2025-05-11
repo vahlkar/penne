@@ -14,8 +14,9 @@ import { Report } from '../../utils/db';
 
 interface GeneralInformationProps {
   report: Report;
-  onSave: (updatedReport: Report) => Promise<void>;
+  onSave: (report: Report) => void;
   onDirtyChange: (isDirty: boolean) => void;
+  onFormDataChange: (data: Report) => void;
   onDelete?: () => void;
 }
 
@@ -23,27 +24,30 @@ const GeneralInformation: React.FC<GeneralInformationProps> = ({
   report, 
   onSave, 
   onDirtyChange,
+  onFormDataChange,
   onDelete 
 }) => {
   const [formData, setFormData] = useState<Report>(report);
+  const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
     setFormData(report);
+    setIsDirty(false);
   }, [report]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    const newData = {
-      ...formData,
-      [name]: value
-    };
+  const handleChange = (field: keyof Report, value: any) => {
+    const newData = { ...formData, [field]: value };
     setFormData(newData);
+    setIsDirty(true);
     onDirtyChange(true);
+    onFormDataChange(newData);
   };
 
   const handleSave = async () => {
     try {
       await onSave(formData);
+      setIsDirty(false);
+      onDirtyChange(false);
     } catch (error) {
       console.error('Failed to save report:', error);
     }
@@ -58,7 +62,7 @@ const GeneralInformation: React.FC<GeneralInformationProps> = ({
             <Input
               name="name"
               value={formData.name}
-              onChange={handleChange}
+              onChange={(e) => handleChange('name', e.target.value)}
               placeholder="Enter report name"
             />
           </FormControl>
@@ -88,7 +92,7 @@ const GeneralInformation: React.FC<GeneralInformationProps> = ({
           <Select
             name="assessmentType"
             value={formData.assessmentType}
-            onChange={handleChange}
+            onChange={(e) => handleChange('assessmentType', e.target.value)}
           >
             <option value="Web Application">Web Application</option>
             <option value="Mobile Application">Mobile Application</option>
@@ -102,7 +106,7 @@ const GeneralInformation: React.FC<GeneralInformationProps> = ({
           <Input
             name="tester"
             value={formData.tester}
-            onChange={handleChange}
+            onChange={(e) => handleChange('tester', e.target.value)}
             placeholder="Enter tester name"
           />
         </FormControl>
@@ -113,7 +117,7 @@ const GeneralInformation: React.FC<GeneralInformationProps> = ({
             name="date"
             type="date"
             value={formData.date}
-            onChange={handleChange}
+            onChange={(e) => handleChange('date', e.target.value)}
           />
         </FormControl>
 
@@ -122,7 +126,7 @@ const GeneralInformation: React.FC<GeneralInformationProps> = ({
           <Input
             name="securityTeam"
             value={formData.securityTeam || ''}
-            onChange={handleChange}
+            onChange={(e) => handleChange('securityTeam', e.target.value)}
             placeholder="Enter security team"
           />
         </FormControl>
@@ -133,7 +137,7 @@ const GeneralInformation: React.FC<GeneralInformationProps> = ({
             name="startDate"
             type="date"
             value={formData.startDate || ''}
-            onChange={handleChange}
+            onChange={(e) => handleChange('startDate', e.target.value)}
           />
         </FormControl>
 
@@ -143,7 +147,7 @@ const GeneralInformation: React.FC<GeneralInformationProps> = ({
             name="endDate"
             type="date"
             value={formData.endDate || ''}
-            onChange={handleChange}
+            onChange={(e) => handleChange('endDate', e.target.value)}
           />
         </FormControl>
 
@@ -152,7 +156,7 @@ const GeneralInformation: React.FC<GeneralInformationProps> = ({
           <Input
             name="scope"
             value={formData.scope || ''}
-            onChange={handleChange}
+            onChange={(e) => handleChange('scope', e.target.value)}
             placeholder="Enter scope"
           />
         </FormControl>

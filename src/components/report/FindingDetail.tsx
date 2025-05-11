@@ -33,21 +33,24 @@ import { FiChevronDown, FiChevronRight, FiSave, FiTrash2 } from 'react-icons/fi'
 interface FindingDetailProps {
   findingId: string | null;
   finding: Finding | undefined;
-  onDelete: (findingId: string) => Promise<void>;
-  onSave: (finding: Finding) => Promise<void>;
+  onSave: (finding: Finding) => void;
+  onDelete: (findingId: string) => void;
   onDirtyChange: (isDirty: boolean) => void;
+  onFormDataChange: (data: Finding) => void;
 }
 
-const FindingDetail: React.FC<FindingDetailProps> = ({ 
-  findingId, 
-  finding, 
-  onDelete, 
+const FindingDetail: React.FC<FindingDetailProps> = ({
+  findingId,
+  finding,
   onSave,
-  onDirtyChange 
+  onDelete,
+  onDirtyChange,
+  onFormDataChange
 }) => {
   const { isOpen: isTemporalOpen, onToggle: onTemporalToggle } = useDisclosure();
   const { isOpen: isEnvironmentalOpen, onToggle: onEnvironmentalToggle } = useDisclosure();
   const [formData, setFormData] = useState<Finding | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
   const toast = useToast();
 
   const borderColor = useColorModeValue('gray.200', 'gray.600');
@@ -99,20 +102,17 @@ const FindingDetail: React.FC<FindingDetailProps> = ({
         ...finding,
         cvssVector: defaultCVSSVector
       });
+      setIsDirty(false);
     }
   }, [finding]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => {
-      if (!prev) return null;
-      const newData = {
-        ...prev,
-        [name]: value
-      };
-      onDirtyChange(true);
-      return newData;
-    });
+  const handleChange = (field: keyof Finding, value: any) => {
+    if (!formData) return;
+    const newData = { ...formData, [field]: value };
+    setFormData(newData);
+    setIsDirty(true);
+    onDirtyChange(true);
+    onFormDataChange(newData);
   };
 
   const handleCVSSChange = (metric: string, value: string) => {
@@ -126,13 +126,13 @@ const FindingDetail: React.FC<FindingDetailProps> = ({
         }
       };
       onDirtyChange(true);
+      onFormDataChange(newData);
       return newData;
     });
   };
 
   const handleSave = async () => {
     if (!formData) return;
-
     try {
       await onSave(formData);
       toast({
@@ -141,6 +141,7 @@ const FindingDetail: React.FC<FindingDetailProps> = ({
         duration: 2000,
         isClosable: true,
       });
+      setIsDirty(false);
       onDirtyChange(false);
     } catch (error) {
       toast({
@@ -165,7 +166,7 @@ const FindingDetail: React.FC<FindingDetailProps> = ({
             <Input
               name="title"
               value={formData.title}
-              onChange={handleChange}
+              onChange={(e) => handleChange('title', e.target.value)}
               placeholder="Finding Title"
             />
           </FormControl>
@@ -173,7 +174,7 @@ const FindingDetail: React.FC<FindingDetailProps> = ({
             <Select
               name="type"
               value={formData.type}
-              onChange={handleChange}
+              onChange={(e) => handleChange('type', e.target.value)}
             >
               <option value="Web">Web</option>
               <option value="Mobile">Mobile</option>
@@ -215,7 +216,7 @@ const FindingDetail: React.FC<FindingDetailProps> = ({
                 <Textarea
                   name="description"
                   value={formData.description}
-                  onChange={handleChange}
+                  onChange={(e) => handleChange('description', e.target.value)}
                   placeholder="Enter finding description"
                   minH="200px"
                 />
@@ -226,7 +227,7 @@ const FindingDetail: React.FC<FindingDetailProps> = ({
                 <Textarea
                   name="recommendation"
                   value={formData.recommendation}
-                  onChange={handleChange}
+                  onChange={(e) => handleChange('recommendation', e.target.value)}
                   placeholder="Enter recommendation"
                   minH="200px"
                 />
@@ -237,7 +238,7 @@ const FindingDetail: React.FC<FindingDetailProps> = ({
                 <Textarea
                   name="references"
                   value={formData.references}
-                  onChange={handleChange}
+                  onChange={(e) => handleChange('references', e.target.value)}
                   placeholder="Enter references"
                 />
               </FormControl>
@@ -753,7 +754,7 @@ const FindingDetail: React.FC<FindingDetailProps> = ({
                 <Textarea
                   name="affectedAssets"
                   value={formData.affectedAssets}
-                  onChange={handleChange}
+                  onChange={(e) => handleChange('affectedAssets', e.target.value)}
                   placeholder="Enter affected assets"
                 />
               </FormControl>
@@ -763,7 +764,7 @@ const FindingDetail: React.FC<FindingDetailProps> = ({
                 <Textarea
                   name="stepsToReproduce"
                   value={formData.stepsToReproduce}
-                  onChange={handleChange}
+                  onChange={(e) => handleChange('stepsToReproduce', e.target.value)}
                   placeholder="Enter steps to reproduce"
                   minH="200px"
                 />
