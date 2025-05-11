@@ -19,8 +19,9 @@ import {
   AlertDialogContent,
   AlertDialogOverlay,
   useDisclosure,
+  Heading,
 } from '@chakra-ui/react';
-import { FiSave, FiPlus, FiTrash2 } from 'react-icons/fi';
+import { FiSave, FiPlus, FiTrash2, FiArrowLeft } from 'react-icons/fi';
 import { Report, Finding, getReport, updateReport, getFindingsByReport, addFinding, deleteFinding, updateFinding } from '../utils/db';
 import GeneralInformation from './report/GeneralInformation';
 import FindingDetail from './report/FindingDetail';
@@ -35,6 +36,7 @@ const ReportDetail: React.FC = () => {
   const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const { isOpen: isDeleteAlertOpen, onOpen: onDeleteAlertOpen, onClose: onDeleteAlertClose } = useDisclosure();
+  const { isOpen: isNewFindingAlertOpen, onOpen: onNewFindingAlertOpen, onClose: onNewFindingAlertClose } = useDisclosure();
   const cancelRef = React.useRef<HTMLButtonElement>(null);
 
   const bgColor = useColorModeValue('white', 'gray.800');
@@ -160,6 +162,14 @@ const ReportDetail: React.FC = () => {
   };
 
   const handleNewFinding = async () => {
+    if (isDirty) {
+      onNewFindingAlertOpen();
+    } else {
+      await createNewFinding();
+    }
+  };
+
+  const createNewFinding = async () => {
     if (!id) return;
     const newFinding: Omit<Finding, 'id'> = {
       reportId: id,
@@ -192,7 +202,9 @@ const ReportDetail: React.FC = () => {
     try {
       const savedFinding = await addFinding(newFinding);
       setFindings(prev => [...prev, savedFinding]);
+      setSelectedFindingId(savedFinding.id);
       navigate(`/report/${id}/finding/${savedFinding.id}`);
+      onNewFindingAlertClose();
     } catch (error) {
       toast({
         title: 'Error',
@@ -204,8 +216,18 @@ const ReportDetail: React.FC = () => {
     }
   };
 
+  const handleFindingClick = (findingId: string) => {
+    setSelectedFindingId(findingId);
+    navigate(`/report/${id}/finding/${findingId}`);
+  };
+
+  const handleGeneralInfoClick = () => {
+    setSelectedFindingId(null);
+    navigate(`/report/${id}`);
+  };
+
   if (!report) {
-    return null; // or a loading spinner
+    return null;
   }
 
   return (
@@ -221,9 +243,9 @@ const ReportDetail: React.FC = () => {
         >
           <VStack align="stretch" spacing={4}>
             <Button
-              variant={selectedFindingId ? 'solid' : 'ghost'}
+              variant={!selectedFindingId ? 'solid' : 'ghost'}
               justifyContent="flex-start"
-              onClick={() => setSelectedFindingId(null)}
+              onClick={handleGeneralInfoClick}
             >
               General Information
             </Button>
@@ -252,9 +274,7 @@ const ReportDetail: React.FC = () => {
                     key={finding.id}
                     variant={selectedFindingId === finding.id ? 'solid' : 'ghost'}
                     justifyContent="flex-start"
-                    onClick={() => {
-                      setSelectedFindingId(finding.id);
-                    }}
+                    onClick={() => handleFindingClick(finding.id)}
                   >
                     <Flex justify="space-between" w="100%" align="center">
                       <Text>{finding.title}</Text>
@@ -271,42 +291,11 @@ const ReportDetail: React.FC = () => {
         <Box flex="1" p={6} overflowY="auto">
           <Routes>
             <Route path="/" element={
-              <>
-                <GeneralInformation 
-                  report={report} 
-                  onSave={handleSaveReport}
-                  onDirtyChange={setIsDirty}
-                />
-                <Box>
-                  <Flex justify="space-between" align="center" mb={4}>
-                    <Text fontSize="xl" fontWeight="bold">Findings</Text>
-                    <HStack>
-                      <FindingSort findings={findings} onSort={setFindings} />
-                      <IconButton
-                        aria-label="Add finding"
-                        icon={<FiPlus />}
-                        onClick={handleNewFinding}
-                      />
-                    </HStack>
-                  </Flex>
-                  <VStack spacing={2} align="stretch">
-                    {findings.map(finding => (
-                      <Link key={finding.id} to={`/report/${id}/finding/${finding.id}`}>
-                        <Box
-                          p={4}
-                          borderWidth={1}
-                          borderRadius="md"
-                          _hover={{ bg: 'gray.50' }}
-                        >
-                          <Text fontWeight="bold">{finding.title}</Text>
-                          <Text color="gray.600">Type: {finding.type}</Text>
-                          <Text color="gray.600">CVSS Score: {finding.cvssScore}</Text>
-                        </Box>
-                      </Link>
-                    ))}
-                  </VStack>
-                </Box>
-              </>
+              <GeneralInformation 
+                report={report} 
+                onSave={handleSaveReport}
+                onDirtyChange={setIsDirty}
+              />
             } />
             <Route path="/finding/:findingId" element={
               <FindingDetail
@@ -320,6 +309,34 @@ const ReportDetail: React.FC = () => {
           </Routes>
         </Box>
       </Flex>
+
+      {/* New Finding Alert Dialog */}
+      <AlertDialog
+        isOpen={isNewFindingAlertOpen}
+        leastDestructiveRef={cancelRef}
+        onClose={onNewFindingAlertClose}
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Unsaved Changes
+            </AlertDialogHeader>
+
+            <AlertDialogBody>
+              You have unsaved changes. Would you like to save them before creating a new finding?
+            </AlertDialogBody>
+
+            <AlertDialogFooter>
+              <Button ref={cancelRef} onClick={onNewFindingAlertClose}>
+                Cancel
+              </Button>
+              <Button colorScheme="blue" onClick={createNewFinding} ml={3}>
+                Create New Finding
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </Box>
   );
 };

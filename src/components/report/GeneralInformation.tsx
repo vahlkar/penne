@@ -9,7 +9,7 @@ import {
   Button,
   HStack,
 } from '@chakra-ui/react';
-import { FiSave, FiTrash2, FiEdit } from 'react-icons/fi';
+import { FiSave, FiTrash2 } from 'react-icons/fi';
 import { Report } from '../../utils/db';
 
 interface GeneralInformationProps {
@@ -63,14 +63,6 @@ const GeneralInformation: React.FC<GeneralInformationProps> = ({
             />
           </FormControl>
           <HStack spacing={2}>
-            <Button
-              leftIcon={<FiEdit />}
-              colorScheme="blue"
-              variant="outline"
-              onClick={() => {/* TODO: Implement propose update */}}
-            >
-              Propose Update
-            </Button>
             <Button
               leftIcon={<FiSave />}
               colorScheme="blue"

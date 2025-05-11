@@ -113,12 +113,19 @@ export const getReport = async (id: string): Promise<Report | undefined> => {
 export const deleteReport = async (id: string): Promise<void> => {
   const db = await dbPromise;
   const tx = db.transaction(['reports', 'findings'], 'readwrite');
-  await tx.store.delete('reports', id);
-  const findingsIndex = tx.objectStore('findings').index('by-report');
+  const reportStore = tx.objectStore('reports');
+  const findingStore = tx.objectStore('findings');
+  const findingsIndex = findingStore.index('by-report');
+  
+  // Delete all findings first
   const findings = await findingsIndex.getAll(id);
   for (const finding of findings) {
-    await tx.objectStore('findings').delete(finding.id);
+    await findingStore.delete(finding.id);
   }
+  
+  // Then delete the report
+  await reportStore.delete(id);
+  
   await tx.done;
 };
 

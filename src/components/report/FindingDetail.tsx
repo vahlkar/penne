@@ -28,7 +28,7 @@ import {
   Icon,
 } from '@chakra-ui/react';
 import { Finding } from '../../utils/db';
-import { FiChevronDown, FiChevronRight, FiSave, FiTrash2, FiEdit } from 'react-icons/fi';
+import { FiChevronDown, FiChevronRight, FiSave, FiTrash2 } from 'react-icons/fi';
 
 interface FindingDetailProps {
   findingId: string | null;
@@ -183,14 +183,6 @@ const FindingDetail: React.FC<FindingDetailProps> = ({
           </FormControl>
         </HStack>
         <HStack spacing={2}>
-          <Button
-            leftIcon={<FiEdit />}
-            colorScheme="blue"
-            variant="outline"
-            onClick={() => {/* TODO: Implement propose update */}}
-          >
-            Propose Update
-          </Button>
           <Button
             leftIcon={<FiSave />}
             colorScheme="blue"
