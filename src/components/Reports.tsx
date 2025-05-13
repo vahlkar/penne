@@ -29,8 +29,18 @@ const Reports: React.FC = () => {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
+  const [filteredReports, setFilteredReports] = useState<Report[]>([]);
   const [reportToDelete, setReportToDelete] = useState<Report | null>(null);
   const toast = useToast();
+
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [nameFilter, setNameFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [testerFilter, setTesterFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
+  const [sortField, setSortField] = useState<keyof Report>('date');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     const setupDB = async () => {
@@ -38,6 +48,7 @@ const Reports: React.FC = () => {
         await initDB();
         const allReports = await getAllReports();
         setReports(allReports);
+        setFilteredReports(allReports);
       } catch (error) {
         console.error('Failed to initialize database:', error);
         toast({
@@ -52,6 +63,70 @@ const Reports: React.FC = () => {
 
     setupDB();
   }, [toast]);
+
+  // Filter and sort reports whenever filters or sort options change
+  useEffect(() => {
+    let result = [...reports];
+
+    // Apply search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(report => 
+        report.name.toLowerCase().includes(query) ||
+        report.assessmentType.toLowerCase().includes(query) ||
+        report.tester.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply individual filters
+    if (nameFilter) {
+      result = result.filter(report => 
+        report.name.toLowerCase().includes(nameFilter.toLowerCase())
+      );
+    }
+    if (typeFilter) {
+      result = result.filter(report => 
+        report.assessmentType.toLowerCase().includes(typeFilter.toLowerCase())
+      );
+    }
+    if (testerFilter) {
+      result = result.filter(report => 
+        report.tester.toLowerCase().includes(testerFilter.toLowerCase())
+      );
+    }
+    if (dateFilter) {
+      result = result.filter(report => 
+        report.date.includes(dateFilter)
+      );
+    }
+
+    // Apply sorting
+    result.sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+      
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortDirection === 'asc' 
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+      
+      return sortDirection === 'asc'
+        ? (aValue as number) - (bValue as number)
+        : (bValue as number) - (aValue as number);
+    });
+
+    setFilteredReports(result);
+  }, [reports, searchQuery, nameFilter, typeFilter, testerFilter, dateFilter, sortField, sortDirection]);
+
+  const handleSort = (field: keyof Report) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
 
   const handleNewReport = async (data: { name: string; assessmentType: string; tester: string }) => {
     try {
@@ -119,7 +194,11 @@ const Reports: React.FC = () => {
           <InputLeftElement pointerEvents="none">
             <SearchIcon color="gray.400" />
           </InputLeftElement>
-          <Input placeholder="Search reports..." />
+          <Input 
+            placeholder="Search reports..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </InputGroup>
         <Button leftIcon={<AddIcon />} colorScheme="green" onClick={() => setIsModalOpen(true)}>
           New Penetration Test
@@ -136,58 +215,86 @@ const Reports: React.FC = () => {
                   Name
                   <IconButton
                     aria-label="Sort by name"
-                    icon={<ChevronUpIcon />}
+                    icon={sortField === 'name' ? (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />) : <ChevronUpIcon />}
                     size="xs"
                     variant="ghost"
                     ml={2}
+                    onClick={() => handleSort('name')}
                   />
                 </Flex>
-                <Input size="sm" mt={2} placeholder="Filter name..." />
+                <Input 
+                  size="sm" 
+                  mt={2} 
+                  placeholder="Filter name..." 
+                  value={nameFilter}
+                  onChange={(e) => setNameFilter(e.target.value)}
+                />
               </Th>
               <Th>
                 <Flex align="center">
                   Assessment Type
                   <IconButton
                     aria-label="Sort by type"
-                    icon={<ChevronUpIcon />}
+                    icon={sortField === 'assessmentType' ? (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />) : <ChevronUpIcon />}
                     size="xs"
                     variant="ghost"
                     ml={2}
+                    onClick={() => handleSort('assessmentType')}
                   />
                 </Flex>
-                <Input size="sm" mt={2} placeholder="Filter type..." />
+                <Input 
+                  size="sm" 
+                  mt={2} 
+                  placeholder="Filter type..." 
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                />
               </Th>
               <Th>
                 <Flex align="center">
                   Tester
                   <IconButton
                     aria-label="Sort by tester"
-                    icon={<ChevronUpIcon />}
+                    icon={sortField === 'tester' ? (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />) : <ChevronUpIcon />}
                     size="xs"
                     variant="ghost"
                     ml={2}
+                    onClick={() => handleSort('tester')}
                   />
                 </Flex>
-                <Input size="sm" mt={2} placeholder="Filter tester..." />
+                <Input 
+                  size="sm" 
+                  mt={2} 
+                  placeholder="Filter tester..." 
+                  value={testerFilter}
+                  onChange={(e) => setTesterFilter(e.target.value)}
+                />
               </Th>
               <Th>
                 <Flex align="center">
                   Date
                   <IconButton
                     aria-label="Sort by date"
-                    icon={<ChevronUpIcon />}
+                    icon={sortField === 'date' ? (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />) : <ChevronUpIcon />}
                     size="xs"
                     variant="ghost"
                     ml={2}
+                    onClick={() => handleSort('date')}
                   />
                 </Flex>
-                <Input size="sm" mt={2} placeholder="Filter date..." />
+                <Input 
+                  size="sm" 
+                  mt={2} 
+                  placeholder="Filter date..." 
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                />
               </Th>
               <Th>Actions</Th>
             </Tr>
           </Thead>
           <Tbody>
-            {reports.map((report) => (
+            {filteredReports.map((report) => (
               <Tr key={report.id}>
                 <Td>{report.name}</Td>
                 <Td>{report.assessmentType}</Td>
@@ -226,7 +333,7 @@ const Reports: React.FC = () => {
 
       {/* Footer */}
       <Flex justify="space-between" align="center" mt={4}>
-        <Text>Showing {reports.length} of {reports.length} entries</Text>
+        <Text>Showing {filteredReports.length} of {reports.length} entries</Text>
         <HStack spacing={4}>
           <Text>Results per page:</Text>
           <Select w="70px" size="sm">
