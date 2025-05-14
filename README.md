@@ -1,6 +1,6 @@
 # Penne
 
-A penetration testing reporting tool written in React with browser based local storage and no backend dependency.
+A penetration testing reporting tool written in React with browser based local storage and no backend dependency. Most of the code is AI generated.
 
 ## Getting Started
 
