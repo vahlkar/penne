@@ -1,6 +1,6 @@
-# React Hello World
+# Penne
 
-A simple React Hello World application built with Vite.
+A penetration testing reporting tool written in React with browser based local storage and no backend dependency.
 
 ## Getting Started
 

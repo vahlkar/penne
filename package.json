@@ -1,5 +1,5 @@
 {
-  "name": "pentest-clippy",
+  "name": "penne-reporting",
   "version": "0.1.0-alpha.1",
   "description": "A penetration testing reporting tool as a frontend-only single page application.",
   "type": "module",
