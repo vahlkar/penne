@@ -13,24 +13,62 @@ import {
   Radio,
 } from '@chakra-ui/react';
 import { FiArrowUp, FiArrowDown, FiBarChart2 } from 'react-icons/fi';
+import { Finding } from '../../utils/db';
 
 interface FindingSortProps {
-  sortBy: string;
-  setSortBy: (value: string) => void;
-  sortDirection: 'asc' | 'desc';
-  setSortDirection: (value: 'asc' | 'desc') => void;
-  autoSort: boolean;
-  setAutoSort: (value: boolean) => void;
+  findings: Finding[];
+  onSort: React.Dispatch<React.SetStateAction<Finding[]>>;
 }
 
 const FindingSort: React.FC<FindingSortProps> = ({
-  sortBy,
-  setSortBy,
-  sortDirection,
-  setSortDirection,
-  autoSort,
-  setAutoSort,
+  findings,
+  onSort,
 }) => {
+  const [sortBy, setSortBy] = React.useState('cvss');
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc');
+  const [autoSort, setAutoSort] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!autoSort) return;
+
+    const sortedFindings = [...findings].sort((a, b) => {
+      let aValue: number;
+      let bValue: number;
+
+      switch (sortBy) {
+        case 'cvss':
+          aValue = a.cvssScore;
+          bValue = b.cvssScore;
+          break;
+        case 'cvss-temporal':
+          aValue = a.cvssVector.exploitCodeMaturity === 'not-defined' ? 0 : 1;
+          bValue = b.cvssVector.exploitCodeMaturity === 'not-defined' ? 0 : 1;
+          break;
+        case 'cvss-environmental':
+          aValue = a.cvssVector.confidentialityRequirement === 'not-defined' ? 0 : 1;
+          bValue = b.cvssVector.confidentialityRequirement === 'not-defined' ? 0 : 1;
+          break;
+        case 'priority':
+          aValue = a.cvssScore;
+          bValue = b.cvssScore;
+          break;
+        case 'remediation':
+          aValue = a.cvssVector.remediationLevel === 'not-defined' ? 0 : 1;
+          bValue = b.cvssVector.remediationLevel === 'not-defined' ? 0 : 1;
+          break;
+        default:
+          aValue = 0;
+          bValue = 0;
+      }
+
+      return sortDirection === 'asc'
+        ? aValue - bValue
+        : bValue - aValue;
+    });
+
+    onSort(sortedFindings);
+  }, [findings, sortBy, sortDirection, autoSort, onSort]);
+
   return (
     <Popover placement="bottom-end">
       <PopoverTrigger>

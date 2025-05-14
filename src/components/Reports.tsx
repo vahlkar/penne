@@ -111,9 +111,17 @@ const Reports: React.FC = () => {
           : bValue.localeCompare(aValue);
       }
       
+      // Convert string values to numbers if possible
+      const aNum = typeof aValue === 'string' ? parseFloat(aValue) : (aValue ?? 0);
+      const bNum = typeof bValue === 'string' ? parseFloat(bValue) : (bValue ?? 0);
+      
+      if (isNaN(aNum) || isNaN(bNum)) {
+        return 0; // If conversion fails, maintain original order
+      }
+      
       return sortDirection === 'asc'
-        ? (aValue as number) - (bValue as number)
-        : (bValue as number) - (aValue as number);
+        ? aNum - bNum
+        : bNum - aNum;
     });
 
     setFilteredReports(result);
