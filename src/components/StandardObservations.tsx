@@ -39,9 +39,18 @@ import {
   NumberIncrementStepper,
   NumberDecrementStepper,
   HStack,
+  InputGroup,
+  InputLeftElement,
+  Flex,
+  Text,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverBody,
+  Switch,
   useColorModeValue,
 } from '@chakra-ui/react';
-import { FiPlus, FiEdit2, FiTrash2, FiDownload, FiUpload } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiDownload, FiUpload, FiSearch, FiFilter, FiBarChart2, FiCopy } from 'react-icons/fi';
 import { Finding, getAllStandardObservations, deleteStandardObservation, addStandardObservation, updateStandardObservation } from '../utils/db';
 
 interface ObservationFormData {
@@ -84,10 +93,68 @@ const StandardObservations: React.FC = () => {
   const { isOpen: isFormOpen, onOpen: onFormOpen, onClose: onFormClose } = useDisclosure();
   const cancelRef = useRef<HTMLButtonElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [severityFilter, setSeverityFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [sortField, setSortField] = useState<string>('severity');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [filteredObservations, setFilteredObservations] = useState<Finding[]>([]);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<Finding | null>(null);
 
   useEffect(() => {
     loadObservations();
   }, []);
+
+  useEffect(() => {
+    let result = [...observations];
+
+    // Apply search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(obs => 
+        obs.title.toLowerCase().includes(query) ||
+        obs.summary.toLowerCase().includes(query) ||
+        obs.technical_details.impact.toLowerCase().includes(query) ||
+        obs.technical_details.testing_process.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply severity filter
+    if (severityFilter) {
+      result = result.filter(obs => obs.severity === severityFilter);
+    }
+
+    // Apply status filter
+    if (statusFilter) {
+      result = result.filter(obs => obs.status === statusFilter);
+    }
+
+    // Apply sorting
+    result.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'severity':
+          const severityOrder = { critical: 4, high: 3, medium: 2, low: 1, informational: 0 };
+          comparison = severityOrder[b.severity] - severityOrder[a.severity];
+          break;
+        case 'cvss_score':
+          comparison = b.cvss_score - a.cvss_score;
+          break;
+        case 'title':
+          comparison = a.title.localeCompare(b.title);
+          break;
+        case 'status':
+          comparison = a.status.localeCompare(b.status);
+          break;
+        default:
+          comparison = 0;
+      }
+      return sortDirection === 'asc' ? -comparison : comparison;
+    });
+
+    setFilteredObservations(result);
+  }, [observations, searchQuery, severityFilter, statusFilter, sortField, sortDirection]);
 
   const loadObservations = async () => {
     try {
@@ -263,6 +330,45 @@ const StandardObservations: React.FC = () => {
     }
   };
 
+  const handleUseAsTemplate = (observation: Finding) => {
+    setSelectedTemplate(observation);
+    setIsTemplateModalOpen(true);
+  };
+
+  const handleTemplateConfirm = async () => {
+    if (!selectedTemplate) return;
+
+    try {
+      const newObservation = {
+        ...selectedTemplate,
+        id: crypto.randomUUID(),
+        title: `${selectedTemplate.title} (Copy)`,
+        status: 'unresolved',
+      };
+      await addStandardObservation(newObservation);
+      await loadObservations();
+      toast({
+        title: 'Template applied',
+        description: 'New observation created from template',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Failed to create observation from template:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create observation from template',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsTemplateModalOpen(false);
+      setSelectedTemplate(null);
+    }
+  };
+
   return (
     <Container maxW="container.xl" pt={20}>
       <VStack spacing={6} align="stretch">
@@ -291,6 +397,81 @@ const StandardObservations: React.FC = () => {
           </HStack>
         </Box>
 
+        {/* Search and Filters */}
+        <Box>
+          <Flex gap={4} mb={4}>
+            <InputGroup maxW="400px">
+              <InputLeftElement pointerEvents="none">
+                <FiSearch color="gray.300" />
+              </InputLeftElement>
+              <Input
+                placeholder="Search observations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </InputGroup>
+            <Select
+              placeholder="Filter by severity"
+              value={severityFilter}
+              onChange={(e) => setSeverityFilter(e.target.value)}
+              maxW="200px"
+            >
+              <option value="">All Severities</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+              <option value="informational">Informational</option>
+            </Select>
+            <Select
+              placeholder="Filter by status"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              maxW="200px"
+            >
+              <option value="">All Statuses</option>
+              <option value="unresolved">Unresolved</option>
+              <option value="resolved">Resolved</option>
+              <option value="accepted_risk">Accepted Risk</option>
+              <option value="false_positive">False Positive</option>
+            </Select>
+            <Popover placement="bottom-end">
+              <PopoverTrigger>
+                <IconButton
+                  aria-label="Sort options"
+                  icon={<FiBarChart2 />}
+                  variant="ghost"
+                />
+              </PopoverTrigger>
+              <PopoverContent width="300px">
+                <PopoverBody p={4}>
+                  <VStack spacing={4} align="stretch">
+                    <Text fontWeight="bold">Sort By</Text>
+                    <Select
+                      value={sortField}
+                      onChange={(e) => setSortField(e.target.value)}
+                    >
+                      <option value="severity">Severity</option>
+                      <option value="cvss_score">CVSS Score</option>
+                      <option value="title">Title</option>
+                      <option value="status">Status</option>
+                    </Select>
+                    <HStack justify="space-between">
+                      <Text>Direction</Text>
+                      <Button
+                        size="sm"
+                        onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                      >
+                        {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+                      </Button>
+                    </HStack>
+                  </VStack>
+                </PopoverBody>
+              </PopoverContent>
+            </Popover>
+          </Flex>
+        </Box>
+
         <input
           type="file"
           ref={fileInputRef}
@@ -310,7 +491,7 @@ const StandardObservations: React.FC = () => {
             </Tr>
           </Thead>
           <Tbody>
-            {observations.map((observation) => (
+            {filteredObservations.map((observation) => (
               <Tr key={observation.id}>
                 <Td>{observation.title}</Td>
                 <Td>
@@ -325,23 +506,30 @@ const StandardObservations: React.FC = () => {
                   </Badge>
                 </Td>
                 <Td>
-                  <IconButton
-                    aria-label="Edit observation"
-                    icon={<FiEdit2 />}
-                    size="sm"
-                    mr={2}
-                    onClick={() => handleEdit(observation)}
-                  />
-                  <IconButton
-                    aria-label="Delete observation"
-                    icon={<FiTrash2 />}
-                    size="sm"
-                    colorScheme="red"
-                    onClick={() => {
-                      setSelectedObservation(observation);
-                      onDeleteOpen();
-                    }}
-                  />
+                  <HStack spacing={2}>
+                    <IconButton
+                      aria-label="Use as template"
+                      icon={<FiCopy />}
+                      size="sm"
+                      onClick={() => handleUseAsTemplate(observation)}
+                    />
+                    <IconButton
+                      aria-label="Edit observation"
+                      icon={<FiEdit2 />}
+                      size="sm"
+                      onClick={() => handleEdit(observation)}
+                    />
+                    <IconButton
+                      aria-label="Delete observation"
+                      icon={<FiTrash2 />}
+                      size="sm"
+                      colorScheme="red"
+                      onClick={() => {
+                        setSelectedObservation(observation);
+                        onDeleteOpen();
+                      }}
+                    />
+                  </HStack>
                 </Td>
               </Tr>
             ))}
@@ -518,6 +706,29 @@ const StandardObservations: React.FC = () => {
               </Button>
               <Button colorScheme="blue" onClick={handleFormSubmit}>
                 {isEditing ? 'Update' : 'Create'}
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
+        {/* Template Confirmation Modal */}
+        <Modal isOpen={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)}>
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Use as Template</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <Text>Do you want to create a new observation based on this template?</Text>
+              <Text mt={2} fontWeight="bold">
+                {selectedTemplate?.title}
+              </Text>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" mr={3} onClick={() => setIsTemplateModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button colorScheme="blue" onClick={handleTemplateConfirm}>
+                Create from Template
               </Button>
             </ModalFooter>
           </ModalContent>
