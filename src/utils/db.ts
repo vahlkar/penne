@@ -99,10 +99,18 @@ interface PentestReportsDB extends DBSchema {
       'by-engagement': string;
     };
   };
+  standard_observations: {
+    key: string;
+    value: Finding;
+    indexes: {
+      'by-severity': string;
+      'by-status': string;
+    };
+  };
 }
 
 const DB_NAME = 'pentest-reports';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let dbPromise: Promise<IDBPDatabase<PentestReportsDB>>;
 
@@ -114,6 +122,11 @@ export const initDB = async (): Promise<void> => {
         reportStore.createIndex('by-date', 'report_metadata.date_generated');
         reportStore.createIndex('by-client', 'report_metadata.client_name');
         reportStore.createIndex('by-engagement', 'report_metadata.engagement_name');
+      }
+      if (oldVersion < 4) {
+        const observationsStore = db.createObjectStore('standard_observations', { keyPath: 'id' });
+        observationsStore.createIndex('by-severity', 'severity');
+        observationsStore.createIndex('by-status', 'status');
       }
     },
   });
@@ -170,4 +183,50 @@ export const getReportsByDateRange = async (startDate: string, endDate: string):
   const index = tx.store.index('by-date');
   const range = IDBKeyRange.bound(startDate, endDate);
   return index.getAll(range);
+};
+
+// Standard Observations CRUD operations
+export const addStandardObservation = async (observation: Omit<Finding, 'id' | 'report_id'>): Promise<Finding> => {
+  const db = await dbPromise;
+  const newObservation: Finding = {
+    ...observation,
+    id: crypto.randomUUID(),
+    report_id: 'standard', // Special identifier for standard observations
+  };
+  await db.add('standard_observations', newObservation);
+  return newObservation;
+};
+
+export const updateStandardObservation = async (observation: Finding): Promise<void> => {
+  const db = await dbPromise;
+  await db.put('standard_observations', observation);
+};
+
+export const getAllStandardObservations = async (): Promise<Finding[]> => {
+  const db = await dbPromise;
+  return db.getAll('standard_observations');
+};
+
+export const getStandardObservation = async (id: string): Promise<Finding | undefined> => {
+  const db = await dbPromise;
+  return db.get('standard_observations', id);
+};
+
+export const deleteStandardObservation = async (id: string): Promise<void> => {
+  const db = await dbPromise;
+  await db.delete('standard_observations', id);
+};
+
+export const getStandardObservationsBySeverity = async (severity: string): Promise<Finding[]> => {
+  const db = await dbPromise;
+  const tx = db.transaction('standard_observations', 'readonly');
+  const index = tx.store.index('by-severity');
+  return index.getAll(severity);
+};
+
+export const getStandardObservationsByStatus = async (status: string): Promise<Finding[]> => {
+  const db = await dbPromise;
+  const tx = db.transaction('standard_observations', 'readonly');
+  const index = tx.store.index('by-status');
+  return index.getAll(status);
 }; 

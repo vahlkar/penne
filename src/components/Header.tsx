@@ -21,13 +21,13 @@ const Header: React.FC = () => {
         <Tabs 
           variant="enclosed" 
           index={location.pathname === '/' ? 0 : 
-                 location.pathname === '/vulnerabilities' ? 1 : 
+                 location.pathname === '/standard-observations' ? 1 : 
                  location.pathname === '/configuration' ? 2 :
                  location.pathname === '/about' ? 3 : 0}
         >
           <TabList>
             <Tab as={Link} to="/">Reports</Tab>
-            <Tab as={Link} to="/vulnerabilities">Vulnerabilities</Tab>
+            <Tab as={Link} to="/standard-observations">Standard Observations</Tab>
             <Tab as={Link} to="/configuration">Configuration</Tab>
             <Tab as={Link} to="/about">About</Tab>
           </TabList>
