@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Routes, Route, Link } from 'react-router-dom';
+import { useParams, useNavigate, Routes, Route } from 'react-router-dom';
 import {
   Box,
   VStack,
@@ -7,7 +7,6 @@ import {
   Flex,
   useColorModeValue,
   Button,
-  Icon,
   Badge,
   HStack,
   useToast,
@@ -19,24 +18,24 @@ import {
   AlertDialogContent,
   AlertDialogOverlay,
   useDisclosure,
-  Heading,
 } from '@chakra-ui/react';
-import { FiSave, FiPlus, FiTrash2, FiArrowLeft } from 'react-icons/fi';
-import { Report, Finding, getReport, updateReport, getFindingsByReport, addFinding, deleteFinding, updateFinding } from '../utils/db';
-import GeneralInformation from './report/GeneralInformation';
-import FindingDetail from './report/FindingDetail';
-import FindingSort from './report/FindingSort';
+import { FiPlus, FiArrowLeft } from 'react-icons/fi';
+import { Report, getReport, updateReport } from '../utils/db';
+
+// Import section components
+import ReportMetadata from './report/ReportMetadata';
+import Scope from './report/Scope';
+import ExecutiveSummary from './report/ExecutiveSummary';
+import Findings from './report/Findings';
+import Artefacts from './report/Artefacts';
 
 const ReportDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const toast = useToast();
   const [report, setReport] = useState<Report | null>(null);
-  const [findings, setFindings] = useState<Finding[]>([]);
-  const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
-  const [currentFormData, setCurrentFormData] = useState<Finding | Report | null>(null);
-  const { isOpen: isDeleteAlertOpen, onOpen: onDeleteAlertOpen, onClose: onDeleteAlertClose } = useDisclosure();
+  const [currentFormData, setCurrentFormData] = useState<Report | null>(null);
   const { isOpen: isUnsavedChangesOpen, onOpen: onUnsavedChangesOpen, onClose: onUnsavedChangesClose } = useDisclosure();
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
   const cancelRef = React.useRef<HTMLButtonElement>(null);
@@ -48,14 +47,9 @@ const ReportDetail: React.FC = () => {
     const loadData = async () => {
       if (!id) return;
       try {
-        const [reportData, findingsData] = await Promise.all([
-          getReport(id),
-          getFindingsByReport(id)
-        ]);
-        
+        const reportData = await getReport(id);
         if (reportData) {
           setReport(reportData);
-          setFindings(findingsData);
         } else {
           toast({
             title: 'Error',
@@ -106,63 +100,6 @@ const ReportDetail: React.FC = () => {
     }
   };
 
-  const handleSaveFinding = async (finding: Finding) => {
-    try {
-      if (finding.id) {
-        await updateFinding(finding);
-        setFindings(prev => prev.map(f => f.id === finding.id ? finding : f));
-      } else {
-        const newFinding = await addFinding(finding);
-        setFindings(prev => [...prev, newFinding]);
-        navigate(`/report/${id}/finding/${newFinding.id}`);
-      }
-      toast({
-        title: 'Success',
-        description: 'Finding saved successfully',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-      setIsDirty(false);
-    } catch (error) {
-      console.error('Failed to save finding:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to save finding',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    }
-  };
-
-  const handleDeleteFinding = async (findingId: string) => {
-    try {
-      await deleteFinding(findingId);
-      setFindings(prev => prev.filter(f => f.id !== findingId));
-      if (selectedFindingId === findingId) {
-        setSelectedFindingId(null);
-        navigate(`/report/${id}`);
-      }
-      toast({
-        title: 'Success',
-        description: 'Finding deleted successfully',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-    } catch (error) {
-      console.error('Failed to delete finding:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete finding',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    }
-  };
-
   const handleNavigation = (navigationAction: () => void) => {
     if (isDirty) {
       setPendingNavigation(() => navigationAction);
@@ -190,11 +127,7 @@ const ReportDetail: React.FC = () => {
     if (!currentFormData) return;
 
     try {
-      if (selectedFindingId) {
-        await handleSaveFinding(currentFormData as Finding);
-      } else if (report) {
-        await handleSaveReport(currentFormData as Report);
-      }
+      await handleSaveReport(currentFormData);
       handleConfirmNavigation();
     } catch (error) {
       console.error('Failed to save:', error);
@@ -206,70 +139,6 @@ const ReportDetail: React.FC = () => {
         isClosable: true,
       });
     }
-  };
-
-  const handleNewFinding = () => {
-    handleNavigation(async () => {
-      if (!id) return;
-      const newFinding: Omit<Finding, 'id'> = {
-        reportId: id,
-        title: '',
-        type: 'Web',
-        cvssScore: 0,
-        description: '',
-        recommendation: '',
-        references: '',
-        affectedAssets: '',
-        stepsToReproduce: '',
-        cvssVector: {
-          attackVector: 'network',
-          scope: 'unchanged',
-          attackComplexity: 'low',
-          privilegesRequired: 'none',
-          userInteraction: 'none',
-          confidentialityImpact: 'none',
-          integrityImpact: 'none',
-          availabilityImpact: 'none',
-          exploitCodeMaturity: 'not-defined',
-          remediationLevel: 'not-defined',
-          reportConfidence: 'not-defined',
-          confidentialityRequirement: 'not-defined',
-          integrityRequirement: 'not-defined',
-          availabilityRequirement: 'not-defined',
-        },
-        isCompleted: false,
-      };
-      try {
-        const savedFinding = await addFinding(newFinding);
-        setFindings(prev => [...prev, savedFinding]);
-        setSelectedFindingId(savedFinding.id);
-        navigate(`/report/${id}/finding/${savedFinding.id}`);
-      } catch (error) {
-        toast({
-          title: 'Error',
-          description: 'Failed to create new finding',
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        });
-      }
-    });
-  };
-
-  const handleFindingClick = (findingId: string) => {
-    if (selectedFindingId === findingId) return;
-    handleNavigation(() => {
-      setSelectedFindingId(findingId);
-      navigate(`/report/${id}/finding/${findingId}`);
-    });
-  };
-
-  const handleGeneralInfoClick = () => {
-    if (!selectedFindingId) return;
-    handleNavigation(() => {
-      setSelectedFindingId(null);
-      navigate(`/report/${id}`);
-    });
   };
 
   if (!report) {
@@ -289,67 +158,97 @@ const ReportDetail: React.FC = () => {
         >
           <VStack align="stretch" spacing={4}>
             <Button
-              variant={!selectedFindingId ? 'solid' : 'ghost'}
-              justifyContent="flex-start"
-              onClick={handleGeneralInfoClick}
+              leftIcon={<FiArrowLeft />}
+              variant="ghost"
+              onClick={() => handleNavigation(() => navigate('/'))}
             >
-              General Information
+              Back to Reports
             </Button>
-            <Box>
-              <HStack justify="space-between" mb={2}>
-                <Text fontWeight="bold">
-                  Findings ({findings.length})
-                </Text>
-                <HStack>
-                  <FindingSort
-                    findings={findings}
-                    onSort={setFindings}
-                  />
-                  <IconButton
-                    aria-label="Add finding"
-                    icon={<FiPlus />}
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleNewFinding}
-                  />
-                </HStack>
-              </HStack>
-              <VStack align="stretch" spacing={2}>
-                {findings.map((finding) => (
-                  <Button
-                    key={finding.id}
-                    variant={selectedFindingId === finding.id ? 'solid' : 'ghost'}
-                    justifyContent="flex-start"
-                    onClick={() => handleFindingClick(finding.id)}
-                  >
-                    <Flex justify="space-between" w="100%" align="center">
-                      <Text>{finding.title}</Text>
-                      <Badge colorScheme="red">{finding.cvssScore}</Badge>
-                    </Flex>
-                  </Button>
-                ))}
-              </VStack>
-            </Box>
+            <Text fontWeight="bold" fontSize="lg">
+              {report.report_metadata.engagement_name}
+            </Text>
+            <VStack align="stretch" spacing={2}>
+              <Button
+                variant="ghost"
+                justifyContent="flex-start"
+                onClick={() => handleNavigation(() => navigate(`/report/${id}/metadata`))}
+              >
+                Report Metadata
+              </Button>
+              <Button
+                variant="ghost"
+                justifyContent="flex-start"
+                onClick={() => handleNavigation(() => navigate(`/report/${id}/scope`))}
+              >
+                Scope
+              </Button>
+              <Button
+                variant="ghost"
+                justifyContent="flex-start"
+                onClick={() => handleNavigation(() => navigate(`/report/${id}/executive-summary`))}
+              >
+                Executive Summary
+              </Button>
+              <Button
+                variant="ghost"
+                justifyContent="flex-start"
+                onClick={() => handleNavigation(() => navigate(`/report/${id}/findings`))}
+              >
+                Findings
+                <Badge ml={2} colorScheme="red">
+                  {report.findings.length}
+                </Badge>
+              </Button>
+              <Button
+                variant="ghost"
+                justifyContent="flex-start"
+                onClick={() => handleNavigation(() => navigate(`/report/${id}/artefacts`))}
+              >
+                Artefacts
+              </Button>
+            </VStack>
           </VStack>
         </Box>
 
         {/* Main Content */}
         <Box flex="1" p={6} overflowY="auto">
           <Routes>
-            <Route path="/" element={
-              <GeneralInformation 
+            <Route path="/metadata" element={
+              <ReportMetadata 
                 report={report} 
                 onSave={handleSaveReport}
                 onDirtyChange={setIsDirty}
                 onFormDataChange={setCurrentFormData}
               />
             } />
-            <Route path="/finding/:findingId" element={
-              <FindingDetail
-                findingId={selectedFindingId}
-                finding={findings.find(f => f.id === selectedFindingId)}
-                onDelete={handleDeleteFinding}
-                onSave={handleSaveFinding}
+            <Route path="/scope" element={
+              <Scope 
+                report={report} 
+                onSave={handleSaveReport}
+                onDirtyChange={setIsDirty}
+                onFormDataChange={setCurrentFormData}
+              />
+            } />
+            <Route path="/executive-summary" element={
+              <ExecutiveSummary 
+                report={report} 
+                onSave={handleSaveReport}
+                onDirtyChange={setIsDirty}
+                onFormDataChange={setCurrentFormData}
+              />
+            } />
+            <Route path="/findings" element={
+              <Findings 
+                report={report} 
+                onSave={handleSaveReport}
+                onDirtyChange={setIsDirty}
+                onFormDataChange={setCurrentFormData}
+              />
+            } />
+            <Route path="/artefacts" element={
+              <Artefacts 
+                report={report} 
+                onSave={handleSaveReport}
                 onDirtyChange={setIsDirty}
                 onFormDataChange={setCurrentFormData}
               />

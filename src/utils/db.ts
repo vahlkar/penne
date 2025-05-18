@@ -1,45 +1,92 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 
+export interface ReportMetadata {
+  report_id: string;
+  client_name: string;
+  engagement_name: string;
+  engagement_id?: string;
+  date_generated: string;
+  date_of_testing: {
+    start: string;
+    end: string;
+  };
+  tester_info: {
+    company: string;
+    team: Array<{
+      name: string;
+      email: string;
+      role: string;
+    }>;
+  };
+  recipient: {
+    company: string;
+    contacts: Array<{
+      name: string;
+      email: string;
+      role: string;
+    }>;
+  };
+  report_version: string;
+}
+
+export interface Scope {
+  in_scope: Array<{
+    target: string;
+    description: string;
+    testing_type: 'black-box' | 'gray-box' | 'white-box';
+    methodologies: string[];
+  }>;
+}
+
+export interface ExecutiveSummary {
+  risk_rating: 'low' | 'medium' | 'high' | 'critical';
+  business_impact: string;
+  strengths: string[];
+  challenges: string[];
+  strategic_recommendations: string[];
+}
+
 export interface Finding {
   id: string;
-  reportId: string;
+  report_id: string;
   title: string;
-  type: string;
-  cvssScore: number;
-  description: string;
-  recommendation: string;
-  references: string;
-  affectedAssets: string;
-  stepsToReproduce: string;
-  cvssVector: {
-    attackVector: string;
-    scope: string;
-    attackComplexity: string;
-    privilegesRequired: string;
-    userInteraction: string;
-    confidentialityImpact: string;
-    integrityImpact: string;
-    availabilityImpact: string;
-    exploitCodeMaturity?: string;
-    remediationLevel?: string;
-    reportConfidence?: string;
-    confidentialityRequirement?: string;
-    integrityRequirement?: string;
-    availabilityRequirement?: string;
+  severity: 'informational' | 'low' | 'medium' | 'high' | 'critical';
+  cvss_score: number;
+  cvss_vector?: string;
+  summary: string;
+  affected_assets: string[];
+  technical_details: {
+    impact: string;
+    testing_process: string;
   };
-  isCompleted: boolean;
+  recommendations: string[];
+  references?: string[];
+  status: 'resolved' | 'unresolved' | 'accepted_risk' | 'false_positive';
+  media?: Array<{
+    type: 'screenshot' | 'script' | 'pcap' | 'other';
+    file_name: string;
+    file_path: string;
+  }>;
+}
+
+export interface Artefacts {
+  global_test_log?: {
+    file_name: string;
+    file_path: string;
+  };
+  tools_used: Array<{
+    tool_name: string;
+    version: string;
+  }>;
 }
 
 export interface Report {
   id: string;
-  name: string;
-  assessmentType: string;
-  tester: string;
-  date: string;
-  securityTeam?: string;
-  startDate?: string;
-  endDate?: string;
-  scope?: string;
+  report_metadata: ReportMetadata;
+  scope: Scope;
+  executive_summary: ExecutiveSummary;
+  findings: Finding[];
+  artefacts: Artefacts;
 }
 
 interface PentestReportsDB extends DBSchema {
@@ -48,21 +95,14 @@ interface PentestReportsDB extends DBSchema {
     value: Report;
     indexes: {
       'by-date': string;
-      'by-type': string;
-      'by-tester': string;
-    };
-  };
-  findings: {
-    key: string;
-    value: Finding;
-    indexes: {
-      'by-report': string;
+      'by-client': string;
+      'by-engagement': string;
     };
   };
 }
 
 const DB_NAME = 'pentest-reports';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbPromise: Promise<IDBPDatabase<PentestReportsDB>>;
 
@@ -71,25 +111,20 @@ export const initDB = async (): Promise<void> => {
     upgrade(db, oldVersion, newVersion) {
       if (oldVersion < 1) {
         const reportStore = db.createObjectStore('reports', { keyPath: 'id' });
-        reportStore.createIndex('by-date', 'date');
-        reportStore.createIndex('by-type', 'assessmentType');
-        reportStore.createIndex('by-tester', 'tester');
-      }
-      if (oldVersion < 2) {
-        const findingStore = db.createObjectStore('findings', { keyPath: 'id' });
-        findingStore.createIndex('by-report', 'reportId');
+        reportStore.createIndex('by-date', 'report_metadata.date_generated');
+        reportStore.createIndex('by-client', 'report_metadata.client_name');
+        reportStore.createIndex('by-engagement', 'report_metadata.engagement_name');
       }
     },
   });
   await dbPromise;
 };
 
-export const addReport = async (report: Omit<Report, 'id' | 'date'>): Promise<Report> => {
+export const addReport = async (report: Omit<Report, 'id'>): Promise<Report> => {
   const db = await dbPromise;
   const newReport: Report = {
     ...report,
     id: crypto.randomUUID(),
-    date: new Date().toISOString().split('T')[0],
   };
   await db.add('reports', newReport);
   return newReport;
@@ -112,35 +147,21 @@ export const getReport = async (id: string): Promise<Report | undefined> => {
 
 export const deleteReport = async (id: string): Promise<void> => {
   const db = await dbPromise;
-  const tx = db.transaction(['reports', 'findings'], 'readwrite');
-  const reportStore = tx.objectStore('reports');
-  const findingStore = tx.objectStore('findings');
-  const findingsIndex = findingStore.index('by-report');
-  
-  // Delete all findings first
-  const findings = await findingsIndex.getAll(id);
-  for (const finding of findings) {
-    await findingStore.delete(finding.id);
-  }
-  
-  // Then delete the report
-  await reportStore.delete(id);
-  
-  await tx.done;
+  await db.delete('reports', id);
 };
 
-export const getReportsByType = async (type: string): Promise<Report[]> => {
+export const getReportsByClient = async (client: string): Promise<Report[]> => {
   const db = await dbPromise;
   const tx = db.transaction('reports', 'readonly');
-  const index = tx.store.index('by-type');
-  return index.getAll(type);
+  const index = tx.store.index('by-client');
+  return index.getAll(client);
 };
 
-export const getReportsByTester = async (tester: string): Promise<Report[]> => {
+export const getReportsByEngagement = async (engagement: string): Promise<Report[]> => {
   const db = await dbPromise;
   const tx = db.transaction('reports', 'readonly');
-  const index = tx.store.index('by-tester');
-  return index.getAll(tester);
+  const index = tx.store.index('by-engagement');
+  return index.getAll(engagement);
 };
 
 export const getReportsByDateRange = async (startDate: string, endDate: string): Promise<Report[]> => {
@@ -149,32 +170,4 @@ export const getReportsByDateRange = async (startDate: string, endDate: string):
   const index = tx.store.index('by-date');
   const range = IDBKeyRange.bound(startDate, endDate);
   return index.getAll(range);
-};
-
-// Findings functions
-export const addFinding = async (finding: Omit<Finding, 'id'>): Promise<Finding> => {
-  const db = await dbPromise;
-  const newFinding: Finding = {
-    ...finding,
-    id: crypto.randomUUID(),
-  };
-  await db.add('findings', newFinding);
-  return newFinding;
-};
-
-export const updateFinding = async (finding: Finding): Promise<void> => {
-  const db = await dbPromise;
-  await db.put('findings', finding);
-};
-
-export const deleteFinding = async (id: string): Promise<void> => {
-  const db = await dbPromise;
-  await db.delete('findings', id);
-};
-
-export const getFindingsByReport = async (reportId: string): Promise<Finding[]> => {
-  const db = await dbPromise;
-  const tx = db.transaction('findings', 'readonly');
-  const index = tx.store.index('by-report');
-  return index.getAll(reportId);
 }; 
