@@ -1,168 +1,168 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
+  Button,
   FormControl,
   FormLabel,
   Input,
   Select,
   VStack,
-  Button,
-  HStack,
+  useToast,
 } from '@chakra-ui/react';
-import { FiSave, FiTrash2 } from 'react-icons/fi';
 import { Report } from '../../utils/db';
 
 interface GeneralInformationProps {
   report: Report;
   onSave: (report: Report) => void;
   onDirtyChange: (isDirty: boolean) => void;
-  onFormDataChange: (data: Report) => void;
-  onDelete?: () => void;
+  onFormDataChange: (formData: Report) => void;
 }
 
-const GeneralInformation: React.FC<GeneralInformationProps> = ({ 
-  report, 
-  onSave, 
+export const GeneralInformation: React.FC<GeneralInformationProps> = ({
+  report,
+  onSave,
   onDirtyChange,
   onFormDataChange,
-  onDelete 
 }) => {
   const [formData, setFormData] = useState<Report>(report);
-  const [isDirty, setIsDirty] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     setFormData(report);
-    setIsDirty(false);
   }, [report]);
 
   const handleChange = (field: keyof Report, value: any) => {
     const newData = { ...formData, [field]: value };
     setFormData(newData);
-    setIsDirty(true);
-    onDirtyChange(true);
     onFormDataChange(newData);
+    onDirtyChange(true);
   };
 
-  const handleSave = async () => {
+  const handleSubmit = async () => {
     try {
       await onSave(formData);
-      setIsDirty(false);
+      toast({
+        title: 'General information saved',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
       onDirtyChange(false);
     } catch (error) {
-      console.error('Failed to save report:', error);
+      toast({
+        title: 'Error saving general information',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
 
   return (
-    <Box>
+    <Box p={4}>
       <VStack spacing={4} align="stretch">
-        <HStack justify="space-between" mb={4}>
-          <FormControl>
-            <FormLabel>Report Name</FormLabel>
-            <Input
-              name="name"
-              value={formData.name}
-              onChange={(e) => handleChange('name', e.target.value)}
-              placeholder="Enter report name"
-            />
-          </FormControl>
-          <HStack spacing={2}>
-            <Button
-              leftIcon={<FiSave />}
-              colorScheme="blue"
-              onClick={handleSave}
-            >
-              Save
-            </Button>
-            {onDelete && (
-              <Button
-                leftIcon={<FiTrash2 />}
-                colorScheme="red"
-                variant="outline"
-                onClick={onDelete}
-              >
-                Delete
-              </Button>
-            )}
-          </HStack>
-        </HStack>
-
-        <FormControl>
-          <FormLabel>Assessment Type</FormLabel>
-          <Select
-            name="assessmentType"
-            value={formData.assessmentType}
-            onChange={(e) => handleChange('assessmentType', e.target.value)}
-          >
-            <option value="Web Application">Web Application</option>
-            <option value="Mobile Application">Mobile Application</option>
-            <option value="Network">Network</option>
-            <option value="API">API</option>
-          </Select>
+        <FormControl isRequired>
+          <FormLabel>Report ID</FormLabel>
+          <Input
+            value={formData.report_metadata.report_id}
+            onChange={(e) => handleChange('report_metadata', {
+              ...formData.report_metadata,
+              report_id: e.target.value
+            })}
+          />
         </FormControl>
 
-        <FormControl>
-          <FormLabel>Tester</FormLabel>
+        <FormControl isRequired>
+          <FormLabel>Client Name</FormLabel>
           <Input
-            name="tester"
-            value={formData.tester}
-            onChange={(e) => handleChange('tester', e.target.value)}
-            placeholder="Enter tester name"
+            value={formData.report_metadata.client_name}
+            onChange={(e) => handleChange('report_metadata', {
+              ...formData.report_metadata,
+              client_name: e.target.value
+            })}
+          />
+        </FormControl>
+
+        <FormControl isRequired>
+          <FormLabel>Engagement Name</FormLabel>
+          <Input
+            value={formData.report_metadata.engagement_name}
+            onChange={(e) => handleChange('report_metadata', {
+              ...formData.report_metadata,
+              engagement_name: e.target.value
+            })}
           />
         </FormControl>
 
         <FormControl>
-          <FormLabel>Date</FormLabel>
+          <FormLabel>Engagement ID</FormLabel>
           <Input
-            name="date"
+            value={formData.report_metadata.engagement_id || ''}
+            onChange={(e) => handleChange('report_metadata', {
+              ...formData.report_metadata,
+              engagement_id: e.target.value
+            })}
+          />
+        </FormControl>
+
+        <FormControl isRequired>
+          <FormLabel>Date Generated</FormLabel>
+          <Input
             type="date"
-            value={formData.date}
-            onChange={(e) => handleChange('date', e.target.value)}
+            value={formData.report_metadata.date_generated}
+            onChange={(e) => handleChange('report_metadata', {
+              ...formData.report_metadata,
+              date_generated: e.target.value
+            })}
           />
         </FormControl>
 
-        <FormControl>
-          <FormLabel>Security Team</FormLabel>
+        <FormControl isRequired>
+          <FormLabel>Testing Period Start</FormLabel>
           <Input
-            name="securityTeam"
-            value={formData.securityTeam || ''}
-            onChange={(e) => handleChange('securityTeam', e.target.value)}
-            placeholder="Enter security team"
-          />
-        </FormControl>
-
-        <FormControl>
-          <FormLabel>Start Date</FormLabel>
-          <Input
-            name="startDate"
             type="date"
-            value={formData.startDate || ''}
-            onChange={(e) => handleChange('startDate', e.target.value)}
+            value={formData.report_metadata.date_of_testing.start}
+            onChange={(e) => handleChange('report_metadata', {
+              ...formData.report_metadata,
+              date_of_testing: {
+                ...formData.report_metadata.date_of_testing,
+                start: e.target.value
+              }
+            })}
           />
         </FormControl>
 
-        <FormControl>
-          <FormLabel>End Date</FormLabel>
+        <FormControl isRequired>
+          <FormLabel>Testing Period End</FormLabel>
           <Input
-            name="endDate"
             type="date"
-            value={formData.endDate || ''}
-            onChange={(e) => handleChange('endDate', e.target.value)}
+            value={formData.report_metadata.date_of_testing.end}
+            onChange={(e) => handleChange('report_metadata', {
+              ...formData.report_metadata,
+              date_of_testing: {
+                ...formData.report_metadata.date_of_testing,
+                end: e.target.value
+              }
+            })}
           />
         </FormControl>
 
-        <FormControl>
-          <FormLabel>Scope</FormLabel>
+        <FormControl isRequired>
+          <FormLabel>Report Version</FormLabel>
           <Input
-            name="scope"
-            value={formData.scope || ''}
-            onChange={(e) => handleChange('scope', e.target.value)}
-            placeholder="Enter scope"
+            value={formData.report_metadata.report_version}
+            onChange={(e) => handleChange('report_metadata', {
+              ...formData.report_metadata,
+              report_version: e.target.value
+            })}
           />
         </FormControl>
+
+        <Button colorScheme="blue" onClick={handleSubmit}>
+          Save Changes
+        </Button>
       </VStack>
     </Box>
   );
-};
-
-export default GeneralInformation; 
+}; 

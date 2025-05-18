@@ -11,6 +11,7 @@ import {
   Switch,
   RadioGroup,
   Radio,
+  Select,
 } from '@chakra-ui/react';
 import { FiArrowUp, FiArrowDown, FiBarChart2 } from 'react-icons/fi';
 import { Finding } from '../../utils/db';
@@ -24,50 +25,82 @@ const FindingSort: React.FC<FindingSortProps> = ({
   findings,
   onSort,
 }) => {
-  const [sortBy, setSortBy] = React.useState('cvss');
+  const [sortBy, setSortBy] = React.useState('cvss_score');
   const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc');
   const [autoSort, setAutoSort] = React.useState(true);
 
   React.useEffect(() => {
     if (!autoSort) return;
 
-    const sortedFindings = [...findings].sort((a, b) => {
-      let aValue: number;
-      let bValue: number;
-
-      switch (sortBy) {
-        case 'cvss':
-          aValue = a.cvssScore;
-          bValue = b.cvssScore;
-          break;
-        case 'cvss-temporal':
-          aValue = a.cvssVector.exploitCodeMaturity === 'not-defined' ? 0 : 1;
-          bValue = b.cvssVector.exploitCodeMaturity === 'not-defined' ? 0 : 1;
-          break;
-        case 'cvss-environmental':
-          aValue = a.cvssVector.confidentialityRequirement === 'not-defined' ? 0 : 1;
-          bValue = b.cvssVector.confidentialityRequirement === 'not-defined' ? 0 : 1;
-          break;
-        case 'priority':
-          aValue = a.cvssScore;
-          bValue = b.cvssScore;
-          break;
-        case 'remediation':
-          aValue = a.cvssVector.remediationLevel === 'not-defined' ? 0 : 1;
-          bValue = b.cvssVector.remediationLevel === 'not-defined' ? 0 : 1;
-          break;
-        default:
-          aValue = 0;
-          bValue = 0;
-      }
-
-      return sortDirection === 'asc'
-        ? aValue - bValue
-        : bValue - aValue;
-    });
+    const sortedFindings = sortFindings(findings, sortBy);
 
     onSort(sortedFindings);
   }, [findings, sortBy, sortDirection, autoSort, onSort]);
+
+  const handleSort = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSortBy(e.target.value);
+  };
+
+  const parseCVSSVector = (vector: string | undefined): Record<string, string> => {
+    if (!vector) return {};
+    const metrics = vector.split('/').reduce((acc, metric) => {
+      const [key, value] = metric.split(':');
+      if (key && value) {
+        acc[key] = value;
+      }
+      return acc;
+    }, {} as Record<string, string>);
+    return metrics;
+  };
+
+  const sortFindings = (findings: Finding[], sortBy: string): Finding[] => {
+    return [...findings].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortBy) {
+        case 'severity':
+          const severityOrder = { critical: 4, high: 3, medium: 2, low: 1, informational: 0 };
+          aValue = severityOrder[a.severity];
+          bValue = severityOrder[b.severity];
+          break;
+
+        case 'cvss_score':
+          aValue = a.cvss_score;
+          bValue = b.cvss_score;
+          break;
+
+        case 'exploit_maturity': {
+          const aMetrics = parseCVSSVector(a.cvss_vector);
+          const bMetrics = parseCVSSVector(b.cvss_vector);
+          aValue = aMetrics['E'] === 'X' ? 0 : 1;
+          bValue = bMetrics['E'] === 'X' ? 0 : 1;
+          break;
+        }
+
+        case 'confidentiality_requirement': {
+          const aMetrics = parseCVSSVector(a.cvss_vector);
+          const bMetrics = parseCVSSVector(b.cvss_vector);
+          aValue = aMetrics['CR'] === 'X' ? 0 : 1;
+          bValue = bMetrics['CR'] === 'X' ? 0 : 1;
+          break;
+        }
+
+        case 'remediation_level': {
+          const aMetrics = parseCVSSVector(a.cvss_vector);
+          const bMetrics = parseCVSSVector(b.cvss_vector);
+          aValue = aMetrics['RL'] === 'X' ? 0 : 1;
+          bValue = bMetrics['RL'] === 'X' ? 0 : 1;
+          break;
+        }
+
+        default:
+          return 0;
+      }
+
+      return bValue - aValue;
+    });
+  };
 
   return (
     <Popover placement="bottom-end">
@@ -91,15 +124,13 @@ const FindingSort: React.FC<FindingSortProps> = ({
             </HStack>
 
             <Text fontWeight="bold">Sort By</Text>
-            <RadioGroup value={sortBy} onChange={setSortBy}>
-              <VStack align="stretch" spacing={2}>
-                <Radio value="cvss">CVSS Score</Radio>
-                <Radio value="cvss-temporal">CVSS Temporal Score</Radio>
-                <Radio value="cvss-environmental">CVSS Environmental Score</Radio>
-                <Radio value="priority">Priority</Radio>
-                <Radio value="remediation">Remediation Difficulty</Radio>
-              </VStack>
-            </RadioGroup>
+            <Select onChange={handleSort} placeholder="Sort by...">
+              <option value="severity">Severity</option>
+              <option value="cvss_score">CVSS Score</option>
+              <option value="exploit_maturity">Exploit Maturity</option>
+              <option value="confidentiality_requirement">Confidentiality Requirement</option>
+              <option value="remediation_level">Remediation Level</option>
+            </Select>
 
             <HStack justify="space-between">
               <Text>Direction</Text>

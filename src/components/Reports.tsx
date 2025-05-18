@@ -39,7 +39,7 @@ const Reports: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState('');
   const [testerFilter, setTesterFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
-  const [sortField, setSortField] = useState<keyof Report>('date');
+  const [sortField, setSortField] = useState<string>('date_generated');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
@@ -72,62 +72,64 @@ const Reports: React.FC = () => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter(report => 
-        report.name.toLowerCase().includes(query) ||
-        report.assessmentType.toLowerCase().includes(query) ||
-        report.tester.toLowerCase().includes(query)
+        report.report_metadata.client_name.toLowerCase().includes(query) ||
+        report.report_metadata.engagement_name.toLowerCase().includes(query) ||
+        report.report_metadata.date_generated.toLowerCase().includes(query)
       );
     }
 
     // Apply individual filters
     if (nameFilter) {
       result = result.filter(report => 
-        report.name.toLowerCase().includes(nameFilter.toLowerCase())
+        report.report_metadata.client_name.toLowerCase().includes(nameFilter.toLowerCase())
       );
     }
     if (typeFilter) {
       result = result.filter(report => 
-        report.assessmentType.toLowerCase().includes(typeFilter.toLowerCase())
+        report.report_metadata.engagement_name.toLowerCase().includes(typeFilter.toLowerCase())
       );
     }
     if (testerFilter) {
       result = result.filter(report => 
-        report.tester.toLowerCase().includes(testerFilter.toLowerCase())
+        report.report_metadata.date_generated.toLowerCase().includes(testerFilter.toLowerCase())
       );
     }
     if (dateFilter) {
       result = result.filter(report => 
-        report.date.includes(dateFilter)
+        report.report_metadata.date_generated.includes(dateFilter)
       );
     }
 
     // Apply sorting
     result.sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-      
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortDirection === 'asc' 
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
+      let aValue: string = '';
+      let bValue: string = '';
+      switch (sortField) {
+        case 'client_name':
+          aValue = a.report_metadata.client_name;
+          bValue = b.report_metadata.client_name;
+          break;
+        case 'engagement_name':
+          aValue = a.report_metadata.engagement_name;
+          bValue = b.report_metadata.engagement_name;
+          break;
+        case 'date_generated':
+          aValue = a.report_metadata.date_generated;
+          bValue = b.report_metadata.date_generated;
+          break;
+        default:
+          aValue = '';
+          bValue = '';
       }
-      
-      // Convert string values to numbers if possible
-      const aNum = typeof aValue === 'string' ? parseFloat(aValue) : (aValue ?? 0);
-      const bNum = typeof bValue === 'string' ? parseFloat(bValue) : (bValue ?? 0);
-      
-      if (isNaN(aNum) || isNaN(bNum)) {
-        return 0; // If conversion fails, maintain original order
-      }
-      
-      return sortDirection === 'asc'
-        ? aNum - bNum
-        : bNum - aNum;
+      return sortDirection === 'asc' 
+        ? aValue.localeCompare(bValue)
+        : bValue.localeCompare(aValue);
     });
 
     setFilteredReports(result);
   }, [reports, searchQuery, nameFilter, typeFilter, testerFilter, dateFilter, sortField, sortDirection]);
 
-  const handleSort = (field: keyof Report) => {
+  const handleSort = (field: string) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -138,7 +140,29 @@ const Reports: React.FC = () => {
 
   const handleNewReport = async (data: { name: string; assessmentType: string; tester: string }) => {
     try {
-      const newReport = await addReport(data);
+      const newReport = await addReport({
+        report_metadata: {
+          report_id: crypto.randomUUID(),
+          client_name: data.name,
+          engagement_name: data.assessmentType,
+          engagement_id: '',
+          date_generated: new Date().toISOString(),
+          date_of_testing: { start: '', end: '' },
+          tester_info: { company: '', team: [] },
+          recipient: { company: '', contacts: [] },
+          report_version: '1.0',
+        },
+        scope: { in_scope: [] },
+        executive_summary: {
+          risk_rating: 'low',
+          business_impact: '',
+          strengths: [],
+          challenges: [],
+          strategic_recommendations: [],
+        },
+        findings: [],
+        artefacts: { tools_used: [] },
+      });
       setReports((prev) => [...prev, newReport]);
       toast({
         title: 'Success',
@@ -223,11 +247,11 @@ const Reports: React.FC = () => {
                   Name
                   <IconButton
                     aria-label="Sort by name"
-                    icon={sortField === 'name' ? (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />) : <ChevronUpIcon />}
+                    icon={sortField === 'client_name' ? (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />) : <ChevronUpIcon />}
                     size="xs"
                     variant="ghost"
                     ml={2}
-                    onClick={() => handleSort('name')}
+                    onClick={() => handleSort('client_name')}
                   />
                 </Flex>
                 <Input 
@@ -243,11 +267,11 @@ const Reports: React.FC = () => {
                   Assessment Type
                   <IconButton
                     aria-label="Sort by type"
-                    icon={sortField === 'assessmentType' ? (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />) : <ChevronUpIcon />}
+                    icon={sortField === 'engagement_name' ? (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />) : <ChevronUpIcon />}
                     size="xs"
                     variant="ghost"
                     ml={2}
-                    onClick={() => handleSort('assessmentType')}
+                    onClick={() => handleSort('engagement_name')}
                   />
                 </Flex>
                 <Input 
@@ -263,11 +287,11 @@ const Reports: React.FC = () => {
                   Tester
                   <IconButton
                     aria-label="Sort by tester"
-                    icon={sortField === 'tester' ? (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />) : <ChevronUpIcon />}
+                    icon={sortField === 'date_generated' ? (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />) : <ChevronUpIcon />}
                     size="xs"
                     variant="ghost"
                     ml={2}
-                    onClick={() => handleSort('tester')}
+                    onClick={() => handleSort('date_generated')}
                   />
                 </Flex>
                 <Input 
@@ -283,11 +307,11 @@ const Reports: React.FC = () => {
                   Date
                   <IconButton
                     aria-label="Sort by date"
-                    icon={sortField === 'date' ? (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />) : <ChevronUpIcon />}
+                    icon={sortField === 'date_generated' ? (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />) : <ChevronUpIcon />}
                     size="xs"
                     variant="ghost"
                     ml={2}
-                    onClick={() => handleSort('date')}
+                    onClick={() => handleSort('date_generated')}
                   />
                 </Flex>
                 <Input 
@@ -304,10 +328,9 @@ const Reports: React.FC = () => {
           <Tbody>
             {filteredReports.map((report) => (
               <Tr key={report.id}>
-                <Td>{report.name}</Td>
-                <Td>{report.assessmentType}</Td>
-                <Td>{report.tester}</Td>
-                <Td>{report.date}</Td>
+                <Td>{report.report_metadata.client_name}</Td>
+                <Td>{report.report_metadata.engagement_name}</Td>
+                <Td>{report.report_metadata.date_generated}</Td>
                 <Td>
                   <HStack spacing={2}>
                     <IconButton
@@ -379,7 +402,7 @@ const Reports: React.FC = () => {
         isOpen={!!reportToDelete}
         onClose={() => setReportToDelete(null)}
         onConfirm={handleDeleteConfirm}
-        reportName={reportToDelete?.name || ''}
+        reportName={reportToDelete?.report_metadata.engagement_name || ''}
       />
     </Container>
   );

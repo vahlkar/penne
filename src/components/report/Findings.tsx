@@ -1,208 +1,116 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
-  VStack,
+  Button,
   FormControl,
   FormLabel,
   Input,
-  Button,
-  HStack,
-  IconButton,
-  Text,
-  useToast,
   Select,
   Textarea,
+  VStack,
+  HStack,
+  Badge,
   Accordion,
   AccordionItem,
   AccordionButton,
   AccordionPanel,
   AccordionIcon,
-  Badge,
+  useToast,
 } from '@chakra-ui/react';
-import { FiPlus, FiTrash2, FiEdit2 } from 'react-icons/fi';
-import { Report, Finding } from '../../utils/db';
-
-type Severity = 'low' | 'medium' | 'high' | 'critical';
-type Status = 'open' | 'in_progress' | 'resolved' | 'false_positive';
+import type { Finding } from '../../utils/db';
 
 interface FindingsProps {
-  report: Report;
-  onSave: (report: Report) => Promise<void>;
-  onDirtyChange: (isDirty: boolean) => void;
-  onFormDataChange: (data: Report) => void;
+  findings: Finding[];
+  onFindingsChange: (findings: Finding[]) => void;
 }
 
-const Findings: React.FC<FindingsProps> = ({
-  report,
-  onSave,
-  onDirtyChange,
-  onFormDataChange,
-}) => {
-  const [formData, setFormData] = useState<Report>(report);
+type Severity = 'informational' | 'low' | 'medium' | 'high' | 'critical';
+
+const getSeverityColor = (severity: Severity): string => {
+  switch (severity) {
+    case 'critical':
+      return 'red';
+    case 'high':
+      return 'orange';
+    case 'medium':
+      return 'yellow';
+    case 'low':
+      return 'green';
+    case 'informational':
+      return 'blue';
+    default:
+      return 'gray';
+  }
+};
+
+export const Findings: React.FC<FindingsProps> = ({ findings, onFindingsChange }) => {
+  const [formData, setFormData] = useState<Finding[]>(findings);
   const [editingFinding, setEditingFinding] = useState<number | null>(null);
   const toast = useToast();
 
-  useEffect(() => {
-    setFormData(report);
-  }, [report]);
-
-  const handleFindingChange = (index: number, field: keyof Finding, value: string | Severity | Status) => {
-    const newFindings = [...formData.findings];
+  const handleFindingChange = (index: number, field: keyof Finding, value: any) => {
+    const newFindings = [...formData];
     newFindings[index] = {
       ...newFindings[index],
       [field]: value,
     };
-    const newData: Report = {
-      ...formData,
-      findings: newFindings,
-    };
-    setFormData(newData);
-    onFormDataChange(newData);
-    onDirtyChange(true);
+    setFormData(newFindings);
+    onFindingsChange(newFindings);
   };
 
-  const handleArrayChange = (index: number, field: 'steps_to_reproduce' | 'remediation_steps', arrayIndex: number, value: string) => {
-    const newFindings = [...formData.findings];
-    const newArray = [...newFindings[index][field]];
-    newArray[arrayIndex] = value;
-    newFindings[index] = {
-      ...newFindings[index],
-      [field]: newArray,
-    };
-    const newData: Report = {
-      ...formData,
-      findings: newFindings,
-    };
-    setFormData(newData);
-    onFormDataChange(newData);
-    onDirtyChange(true);
-  };
-
-  const addArrayItem = (index: number, field: 'steps_to_reproduce' | 'remediation_steps') => {
-    const newFindings = [...formData.findings];
-    const newArray = [...newFindings[index][field], ''];
-    newFindings[index] = {
-      ...newFindings[index],
-      [field]: newArray,
-    };
-    const newData: Report = {
-      ...formData,
-      findings: newFindings,
-    };
-    setFormData(newData);
-    onFormDataChange(newData);
-    onDirtyChange(true);
-  };
-
-  const removeArrayItem = (index: number, field: 'steps_to_reproduce' | 'remediation_steps', arrayIndex: number) => {
-    const newFindings = [...formData.findings];
-    const newArray = newFindings[index][field].filter((_, i) => i !== arrayIndex);
-    newFindings[index] = {
-      ...newFindings[index],
-      [field]: newArray,
-    };
-    const newData: Report = {
-      ...formData,
-      findings: newFindings,
-    };
-    setFormData(newData);
-    onFormDataChange(newData);
-    onDirtyChange(true);
-  };
-
-  const addFinding = () => {
+  const handleAddFinding = () => {
     const newFinding: Finding = {
-      id: `F${formData.findings.length + 1}`,
+      id: crypto.randomUUID(),
+      report_id: '', // This should be set by the parent component
       title: '',
-      description: '',
-      severity: 'low',
-      status: 'open',
-      affected_components: [],
-      steps_to_reproduce: [],
-      remediation_steps: [],
-      references: [],
+      severity: 'informational',
+      cvss_score: 0,
+      summary: '',
+      affected_assets: [],
+      technical_details: {
+        impact: '',
+        testing_process: '',
+      },
+      recommendations: [],
+      status: 'unresolved',
     };
-    const newData: Report = {
-      ...formData,
-      findings: [...formData.findings, newFinding],
-    };
-    setFormData(newData);
-    onFormDataChange(newData);
-    onDirtyChange(true);
-    setEditingFinding(newData.findings.length - 1);
+    setFormData([...formData, newFinding]);
+    onFindingsChange([...formData, newFinding]);
   };
 
-  const removeFinding = (index: number) => {
-    const newFindings = formData.findings.filter((_, i) => i !== index);
-    const newData: Report = {
-      ...formData,
-      findings: newFindings,
-    };
-    setFormData(newData);
-    onFormDataChange(newData);
-    onDirtyChange(true);
+  const handleRemoveFinding = (index: number) => {
+    const newFindings = formData.filter((_, i) => i !== index);
+    setFormData(newFindings);
+    onFindingsChange(newFindings);
   };
 
-  const handleSubmit = async () => {
-    try {
-      await onSave(formData);
-      onDirtyChange(false);
-      toast({
-        title: 'Success',
-        description: 'Findings saved successfully',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to save findings',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    }
-  };
-
-  const getSeverityColor = (severity: Severity) => {
-    switch (severity) {
-      case 'critical':
-        return 'red';
-      case 'high':
-        return 'orange';
-      case 'medium':
-        return 'yellow';
-      case 'low':
-        return 'green';
-    }
+  const handleSave = () => {
+    onFindingsChange(formData);
+    toast({
+      title: 'Findings saved',
+      status: 'success',
+      duration: 3000,
+      isClosable: true,
+    });
   };
 
   return (
     <Box>
-      <VStack spacing={6} align="stretch">
-        <HStack justify="space-between">
-          <Text fontSize="xl" fontWeight="bold">Findings</Text>
-          <Button leftIcon={<FiPlus />} onClick={addFinding}>
-            Add Finding
-          </Button>
-        </HStack>
-
+      <VStack spacing={4} align="stretch">
         <Accordion allowMultiple>
-          {formData.findings.map((finding, index) => (
-            <AccordionItem key={index}>
+          {formData.map((finding, index) => (
+            <AccordionItem key={finding.id}>
               <h2>
                 <AccordionButton>
                   <Box flex="1" textAlign="left">
-                    <HStack>
-                      <Text>{finding.id}</Text>
-                      <Text fontWeight="bold">{finding.title || 'Untitled Finding'}</Text>
+                    <HStack spacing={4}>
                       <Badge colorScheme={getSeverityColor(finding.severity)}>
-                        {finding.severity}
+                        {finding.severity.toUpperCase()}
                       </Badge>
-                      <Badge colorScheme={finding.status === 'resolved' ? 'green' : 'blue'}>
-                        {finding.status}
+                      <Badge colorScheme={finding.status === 'resolved' ? 'green' : 'red'}>
+                        {finding.status.toUpperCase()}
                       </Badge>
+                      <span>{finding.title}</span>
                     </HStack>
                   </Box>
                   <AccordionIcon />
@@ -215,16 +123,6 @@ const Findings: React.FC<FindingsProps> = ({
                     <Input
                       value={finding.title}
                       onChange={(e) => handleFindingChange(index, 'title', e.target.value)}
-                      placeholder="Enter finding title"
-                    />
-                  </FormControl>
-
-                  <FormControl isRequired>
-                    <FormLabel>Description</FormLabel>
-                    <Textarea
-                      value={finding.description}
-                      onChange={(e) => handleFindingChange(index, 'description', e.target.value)}
-                      placeholder="Describe the finding"
                     />
                   </FormControl>
 
@@ -232,8 +130,9 @@ const Findings: React.FC<FindingsProps> = ({
                     <FormLabel>Severity</FormLabel>
                     <Select
                       value={finding.severity}
-                      onChange={(e) => handleFindingChange(index, 'severity', e.target.value as Severity)}
+                      onChange={(e) => handleFindingChange(index, 'severity', e.target.value)}
                     >
+                      <option value="informational">Informational</option>
                       <option value="low">Low</option>
                       <option value="medium">Medium</option>
                       <option value="high">High</option>
@@ -242,92 +141,102 @@ const Findings: React.FC<FindingsProps> = ({
                   </FormControl>
 
                   <FormControl isRequired>
+                    <FormLabel>CVSS Score</FormLabel>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={10}
+                      step={0.1}
+                      value={finding.cvss_score}
+                      onChange={(e) => handleFindingChange(index, 'cvss_score', parseFloat(e.target.value))}
+                    />
+                  </FormControl>
+
+                  <FormControl isRequired>
+                    <FormLabel>Summary</FormLabel>
+                    <Textarea
+                      value={finding.summary}
+                      onChange={(e) => handleFindingChange(index, 'summary', e.target.value)}
+                    />
+                  </FormControl>
+
+                  <FormControl isRequired>
+                    <FormLabel>Affected Assets</FormLabel>
+                    <Textarea
+                      value={finding.affected_assets.join('\n')}
+                      onChange={(e) => handleFindingChange(index, 'affected_assets', e.target.value.split('\n'))}
+                    />
+                  </FormControl>
+
+                  <FormControl isRequired>
+                    <FormLabel>Technical Details - Impact</FormLabel>
+                    <Textarea
+                      value={finding.technical_details.impact}
+                      onChange={(e) => handleFindingChange(index, 'technical_details', {
+                        ...finding.technical_details,
+                        impact: e.target.value,
+                      })}
+                    />
+                  </FormControl>
+
+                  <FormControl isRequired>
+                    <FormLabel>Technical Details - Testing Process</FormLabel>
+                    <Textarea
+                      value={finding.technical_details.testing_process}
+                      onChange={(e) => handleFindingChange(index, 'technical_details', {
+                        ...finding.technical_details,
+                        testing_process: e.target.value,
+                      })}
+                    />
+                  </FormControl>
+
+                  <FormControl isRequired>
+                    <FormLabel>Recommendations</FormLabel>
+                    <Textarea
+                      value={finding.recommendations.join('\n')}
+                      onChange={(e) => handleFindingChange(index, 'recommendations', e.target.value.split('\n'))}
+                    />
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>References</FormLabel>
+                    <Textarea
+                      value={finding.references?.join('\n') || ''}
+                      onChange={(e) => handleFindingChange(index, 'references', e.target.value.split('\n'))}
+                    />
+                  </FormControl>
+
+                  <FormControl isRequired>
                     <FormLabel>Status</FormLabel>
                     <Select
                       value={finding.status}
-                      onChange={(e) => handleFindingChange(index, 'status', e.target.value as Status)}
+                      onChange={(e) => handleFindingChange(index, 'status', e.target.value)}
                     >
-                      <option value="open">Open</option>
-                      <option value="in_progress">In Progress</option>
+                      <option value="unresolved">Unresolved</option>
                       <option value="resolved">Resolved</option>
+                      <option value="accepted_risk">Accepted Risk</option>
                       <option value="false_positive">False Positive</option>
                     </Select>
                   </FormControl>
 
-                  <Box>
-                    <HStack justify="space-between" mb={4}>
-                      <Text fontWeight="bold">Steps to Reproduce</Text>
-                      <Button leftIcon={<FiPlus />} size="sm" onClick={() => addArrayItem(index, 'steps_to_reproduce')}>
-                        Add Step
-                      </Button>
-                    </HStack>
-                    <VStack spacing={4}>
-                      {finding.steps_to_reproduce.map((step, stepIndex) => (
-                        <HStack key={stepIndex} spacing={4} align="start">
-                          <FormControl isRequired>
-                            <Input
-                              value={step}
-                              onChange={(e) => handleArrayChange(index, 'steps_to_reproduce', stepIndex, e.target.value)}
-                              placeholder="Enter a step"
-                            />
-                          </FormControl>
-                          <IconButton
-                            aria-label="Remove step"
-                            icon={<FiTrash2 />}
-                            onClick={() => removeArrayItem(index, 'steps_to_reproduce', stepIndex)}
-                          />
-                        </HStack>
-                      ))}
-                    </VStack>
-                  </Box>
-
-                  <Box>
-                    <HStack justify="space-between" mb={4}>
-                      <Text fontWeight="bold">Remediation Steps</Text>
-                      <Button leftIcon={<FiPlus />} size="sm" onClick={() => addArrayItem(index, 'remediation_steps')}>
-                        Add Step
-                      </Button>
-                    </HStack>
-                    <VStack spacing={4}>
-                      {finding.remediation_steps.map((step, stepIndex) => (
-                        <HStack key={stepIndex} spacing={4} align="start">
-                          <FormControl isRequired>
-                            <Input
-                              value={step}
-                              onChange={(e) => handleArrayChange(index, 'remediation_steps', stepIndex, e.target.value)}
-                              placeholder="Enter a remediation step"
-                            />
-                          </FormControl>
-                          <IconButton
-                            aria-label="Remove step"
-                            icon={<FiTrash2 />}
-                            onClick={() => removeArrayItem(index, 'remediation_steps', stepIndex)}
-                          />
-                        </HStack>
-                      ))}
-                    </VStack>
-                  </Box>
-
-                  <HStack justify="flex-end">
-                    <IconButton
-                      aria-label="Delete finding"
-                      icon={<FiTrash2 />}
-                      colorScheme="red"
-                      onClick={() => removeFinding(index)}
-                    />
-                  </HStack>
+                  <Button colorScheme="red" onClick={() => handleRemoveFinding(index)}>
+                    Remove Finding
+                  </Button>
                 </VStack>
               </AccordionPanel>
             </AccordionItem>
           ))}
         </Accordion>
 
-        <Button colorScheme="blue" onClick={handleSubmit}>
-          Save Changes
-        </Button>
+        <HStack spacing={4}>
+          <Button colorScheme="blue" onClick={handleAddFinding}>
+            Add Finding
+          </Button>
+          <Button colorScheme="green" onClick={handleSave}>
+            Save All Changes
+          </Button>
+        </HStack>
       </VStack>
     </Box>
   );
-};
-
-export default Findings; 
+}; 

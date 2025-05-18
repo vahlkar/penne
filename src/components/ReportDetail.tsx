@@ -20,13 +20,13 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import { FiPlus, FiArrowLeft } from 'react-icons/fi';
-import { Report, getReport, updateReport } from '../utils/db';
+import { Report, getReport, updateReport, Finding } from '../utils/db';
 
 // Import section components
 import ReportMetadata from './report/ReportMetadata';
 import Scope from './report/Scope';
 import ExecutiveSummary from './report/ExecutiveSummary';
-import Findings from './report/Findings';
+import { Findings } from './report/Findings';
 import Artefacts from './report/Artefacts';
 
 const ReportDetail: React.FC = () => {
@@ -238,11 +238,13 @@ const ReportDetail: React.FC = () => {
               />
             } />
             <Route path="/findings" element={
-              <Findings 
-                report={report} 
-                onSave={handleSaveReport}
-                onDirtyChange={setIsDirty}
-                onFormDataChange={setCurrentFormData}
+              <Findings
+                findings={report.findings}
+                onFindingsChange={(newFindings: Finding[]) => {
+                  const updatedReport = { ...report, findings: newFindings };
+                  setIsDirty(true);
+                  setCurrentFormData(updatedReport);
+                }}
               />
             } />
             <Route path="/artefacts" element={

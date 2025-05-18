@@ -39,6 +39,19 @@ interface FindingDetailProps {
   onFormDataChange: (data: Finding) => void;
 }
 
+// Utility to parse and serialize CVSS vector strings
+function parseCVSSVector(vector: string | undefined): Record<string, string> {
+  if (!vector) return {};
+  return vector.split('/').reduce((acc, metric) => {
+    const [key, value] = metric.split(':');
+    if (key && value) acc[key] = value;
+    return acc;
+  }, {} as Record<string, string>);
+}
+function serializeCVSSVector(metrics: Record<string, string>): string {
+  return Object.entries(metrics).map(([k, v]) => `${k}:${v}`).join('/');
+}
+
 const FindingDetail: React.FC<FindingDetailProps> = ({
   findingId,
   finding,
@@ -52,6 +65,7 @@ const FindingDetail: React.FC<FindingDetailProps> = ({
   const [formData, setFormData] = useState<Finding | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const toast = useToast();
+  const [cvssMetrics, setCvssMetrics] = useState<Record<string, string>>({});
 
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   const selectedBg = useColorModeValue('blue.50', 'blue.900');
@@ -88,20 +102,9 @@ const FindingDetail: React.FC<FindingDetailProps> = ({
 
   useEffect(() => {
     if (finding) {
-      // Set default values for temporal and environmental metrics if not present
-      const defaultCVSSVector = {
-        ...finding.cvssVector,
-        exploitCodeMaturity: finding.cvssVector.exploitCodeMaturity || 'not-defined',
-        remediationLevel: finding.cvssVector.remediationLevel || 'not-defined',
-        reportConfidence: finding.cvssVector.reportConfidence || 'not-defined',
-        confidentialityRequirement: finding.cvssVector.confidentialityRequirement || 'not-defined',
-        integrityRequirement: finding.cvssVector.integrityRequirement || 'not-defined',
-        availabilityRequirement: finding.cvssVector.availabilityRequirement || 'not-defined',
-      };
-      setFormData({
-        ...finding,
-        cvssVector: defaultCVSSVector
-      });
+      const metrics = parseCVSSVector(finding.cvss_vector);
+      setCvssMetrics(metrics);
+      setFormData(finding);
       setIsDirty(false);
     }
   }, [finding]);
@@ -116,18 +119,15 @@ const FindingDetail: React.FC<FindingDetailProps> = ({
   };
 
   const handleCVSSChange = (metric: string, value: string) => {
-    setFormData(prev => {
-      if (!prev) return null;
-      const newData = {
-        ...prev,
-        cvssVector: {
-          ...prev.cvssVector,
-          [metric]: value
-        }
-      };
-      onDirtyChange(true);
-      onFormDataChange(newData);
-      return newData;
+    setCvssMetrics(prev => {
+      const updated = { ...prev, [metric]: value };
+      if (formData) {
+        const newData = { ...formData, cvss_vector: serializeCVSSVector(updated) };
+        setFormData(newData);
+        onDirtyChange(true);
+        onFormDataChange(newData);
+      }
+      return updated;
     });
   };
 
@@ -159,621 +159,119 @@ const FindingDetail: React.FC<FindingDetailProps> = ({
   }
 
   return (
-    <VStack spacing={6} align="stretch">
-      <Flex justify="space-between" align="center">
-        <HStack spacing={4}>
-          <FormControl w="300px">
-            <Input
-              name="title"
-              value={formData.title}
-              onChange={(e) => handleChange('title', e.target.value)}
-              placeholder="Finding Title"
-            />
-          </FormControl>
-          <FormControl w="200px">
-            <Select
-              name="type"
-              value={formData.type}
-              onChange={(e) => handleChange('type', e.target.value)}
-            >
-              <option value="Web">Web</option>
-              <option value="Mobile">Mobile</option>
-              <option value="Network">Network</option>
-              <option value="API">API</option>
-            </Select>
-          </FormControl>
-        </HStack>
-        <HStack spacing={2}>
-          <Button
-            leftIcon={<FiSave />}
-            colorScheme="blue"
-            onClick={handleSave}
+    <Box as="form" onSubmit={handleSave}>
+      <VStack spacing={4} align="stretch">
+        <FormControl isRequired>
+          <FormLabel>Title</FormLabel>
+          <Input
+            value={formData.title}
+            onChange={(e) => handleChange('title', e.target.value)}
+          />
+        </FormControl>
+
+        <FormControl isRequired>
+          <FormLabel>Severity</FormLabel>
+          <Select
+            value={formData.severity}
+            onChange={(e) => handleChange('severity', e.target.value)}
           >
+            <option value="informational">Informational</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </Select>
+        </FormControl>
+
+        <FormControl isRequired>
+          <FormLabel>CVSS Score</FormLabel>
+          <Input
+            type="number"
+            min={0}
+            max={10}
+            step={0.1}
+            value={formData.cvss_score}
+            onChange={(e) => handleChange('cvss_score', parseFloat(e.target.value))}
+          />
+        </FormControl>
+
+        <FormControl isRequired>
+          <FormLabel>Summary</FormLabel>
+          <Textarea
+            value={formData.summary}
+            onChange={(e) => handleChange('summary', e.target.value)}
+          />
+        </FormControl>
+
+        <FormControl isRequired>
+          <FormLabel>Affected Assets</FormLabel>
+          <Textarea
+            value={formData.affected_assets.join('\n')}
+            onChange={(e) => handleChange('affected_assets', e.target.value.split('\n'))}
+          />
+        </FormControl>
+
+        <FormControl isRequired>
+          <FormLabel>Technical Details - Impact</FormLabel>
+          <Textarea
+            value={formData.technical_details.impact}
+            onChange={(e) => handleChange('technical_details', {
+              ...formData.technical_details,
+              impact: e.target.value,
+            })}
+          />
+        </FormControl>
+
+        <FormControl isRequired>
+          <FormLabel>Technical Details - Testing Process</FormLabel>
+          <Textarea
+            value={formData.technical_details.testing_process}
+            onChange={(e) => handleChange('technical_details', {
+              ...formData.technical_details,
+              testing_process: e.target.value,
+            })}
+          />
+        </FormControl>
+
+        <FormControl isRequired>
+          <FormLabel>Recommendations</FormLabel>
+          <Textarea
+            value={formData.recommendations.join('\n')}
+            onChange={(e) => handleChange('recommendations', e.target.value.split('\n'))}
+          />
+        </FormControl>
+
+        <FormControl>
+          <FormLabel>References</FormLabel>
+          <Textarea
+            value={formData.references?.join('\n') || ''}
+            onChange={(e) => handleChange('references', e.target.value.split('\n'))}
+          />
+        </FormControl>
+
+        <FormControl isRequired>
+          <FormLabel>Status</FormLabel>
+          <Select
+            value={formData.status}
+            onChange={(e) => handleChange('status', e.target.value)}
+          >
+            <option value="unresolved">Unresolved</option>
+            <option value="resolved">Resolved</option>
+            <option value="accepted_risk">Accepted Risk</option>
+            <option value="false_positive">False Positive</option>
+          </Select>
+        </FormControl>
+
+        <HStack spacing={4}>
+          <Button type="submit" colorScheme="blue">
             Save
           </Button>
-          <Button
-            leftIcon={<FiTrash2 />}
-            colorScheme="red"
-            variant="outline"
-            onClick={() => findingId && onDelete(findingId)}
-          >
+          <Button onClick={() => findingId && onDelete(findingId)}>
             Delete
           </Button>
         </HStack>
-      </Flex>
-
-      <Tabs variant="enclosed" w="100%">
-        <TabList>
-          <Tab>DEFINITION</Tab>
-          <Tab>TECHNICAL DETAILS</Tab>
-        </TabList>
-
-        <TabPanels>
-          <TabPanel>
-            <VStack spacing={6} align="stretch">
-              <FormControl>
-                <FormLabel>Description</FormLabel>
-                <Textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={(e) => handleChange('description', e.target.value)}
-                  placeholder="Enter finding description"
-                  minH="200px"
-                />
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>Recommendation</FormLabel>
-                <Textarea
-                  name="recommendation"
-                  value={formData.recommendation}
-                  onChange={(e) => handleChange('recommendation', e.target.value)}
-                  placeholder="Enter recommendation"
-                  minH="200px"
-                />
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>References</FormLabel>
-                <Textarea
-                  name="references"
-                  value={formData.references}
-                  onChange={(e) => handleChange('references', e.target.value)}
-                  placeholder="Enter references"
-                />
-              </FormControl>
-            </VStack>
-          </TabPanel>
-
-          <TabPanel>
-            <VStack spacing={6} align="stretch">
-              <Box borderWidth={1} p={4} borderRadius="md">
-                <Text fontWeight="bold" mb={4}>CVSS v3.1 Base Score</Text>
-                <Grid templateColumns="repeat(2, 1fr)" gap={6}>
-                  <GridItem>
-                    <FormControl>
-                      <FormLabel fontWeight="bold">Attack Vector (AV)</FormLabel>
-                      <RadioGroup
-                        value={formData.cvssVector.attackVector}
-                        onChange={(value) => handleCVSSChange('attackVector', value)}
-                      >
-                        <HStack spacing={2}>
-                          <RadioBox
-                            value="network"
-                            label="Network (AV:N)"
-                            isChecked={formData.cvssVector.attackVector === 'network'}
-                            onChange={(value) => handleCVSSChange('attackVector', value)}
-                          />
-                          <RadioBox
-                            value="adjacent"
-                            label="Adjacent (AV:A)"
-                            isChecked={formData.cvssVector.attackVector === 'adjacent'}
-                            onChange={(value) => handleCVSSChange('attackVector', value)}
-                          />
-                          <RadioBox
-                            value="local"
-                            label="Local (AV:L)"
-                            isChecked={formData.cvssVector.attackVector === 'local'}
-                            onChange={(value) => handleCVSSChange('attackVector', value)}
-                          />
-                          <RadioBox
-                            value="physical"
-                            label="Physical (AV:P)"
-                            isChecked={formData.cvssVector.attackVector === 'physical'}
-                            onChange={(value) => handleCVSSChange('attackVector', value)}
-                          />
-                        </HStack>
-                      </RadioGroup>
-                    </FormControl>
-                  </GridItem>
-                  <GridItem>
-                    <FormControl>
-                      <FormLabel fontWeight="bold">Scope (S)</FormLabel>
-                      <RadioGroup
-                        value={formData.cvssVector.scope}
-                        onChange={(value) => handleCVSSChange('scope', value)}
-                      >
-                        <HStack spacing={2}>
-                          <RadioBox
-                            value="unchanged"
-                            label="Unchanged (S:U)"
-                            isChecked={formData.cvssVector.scope === 'unchanged'}
-                            onChange={(value) => handleCVSSChange('scope', value)}
-                          />
-                          <RadioBox
-                            value="changed"
-                            label="Changed (S:C)"
-                            isChecked={formData.cvssVector.scope === 'changed'}
-                            onChange={(value) => handleCVSSChange('scope', value)}
-                          />
-                        </HStack>
-                      </RadioGroup>
-                    </FormControl>
-                  </GridItem>
-                  <GridItem>
-                    <FormControl>
-                      <FormLabel fontWeight="bold">Attack Complexity (AC)</FormLabel>
-                      <RadioGroup
-                        value={formData.cvssVector.attackComplexity}
-                        onChange={(value) => handleCVSSChange('attackComplexity', value)}
-                      >
-                        <HStack spacing={2}>
-                          <RadioBox
-                            value="low"
-                            label="Low (AC:L)"
-                            isChecked={formData.cvssVector.attackComplexity === 'low'}
-                            onChange={(value) => handleCVSSChange('attackComplexity', value)}
-                          />
-                          <RadioBox
-                            value="high"
-                            label="High (AC:H)"
-                            isChecked={formData.cvssVector.attackComplexity === 'high'}
-                            onChange={(value) => handleCVSSChange('attackComplexity', value)}
-                          />
-                        </HStack>
-                      </RadioGroup>
-                    </FormControl>
-                  </GridItem>
-                  <GridItem>
-                    <FormControl>
-                      <FormLabel fontWeight="bold">Privileges Required (PR)</FormLabel>
-                      <RadioGroup
-                        value={formData.cvssVector.privilegesRequired}
-                        onChange={(value) => handleCVSSChange('privilegesRequired', value)}
-                      >
-                        <HStack spacing={2}>
-                          <RadioBox
-                            value="none"
-                            label="None (PR:N)"
-                            isChecked={formData.cvssVector.privilegesRequired === 'none'}
-                            onChange={(value) => handleCVSSChange('privilegesRequired', value)}
-                          />
-                          <RadioBox
-                            value="low"
-                            label="Low (PR:L)"
-                            isChecked={formData.cvssVector.privilegesRequired === 'low'}
-                            onChange={(value) => handleCVSSChange('privilegesRequired', value)}
-                          />
-                          <RadioBox
-                            value="high"
-                            label="High (PR:H)"
-                            isChecked={formData.cvssVector.privilegesRequired === 'high'}
-                            onChange={(value) => handleCVSSChange('privilegesRequired', value)}
-                          />
-                        </HStack>
-                      </RadioGroup>
-                    </FormControl>
-                  </GridItem>
-                  <GridItem>
-                    <FormControl>
-                      <FormLabel fontWeight="bold">User Interaction (UI)</FormLabel>
-                      <RadioGroup
-                        value={formData.cvssVector.userInteraction}
-                        onChange={(value) => handleCVSSChange('userInteraction', value)}
-                      >
-                        <HStack spacing={2}>
-                          <RadioBox
-                            value="none"
-                            label="None (UI:N)"
-                            isChecked={formData.cvssVector.userInteraction === 'none'}
-                            onChange={(value) => handleCVSSChange('userInteraction', value)}
-                          />
-                          <RadioBox
-                            value="required"
-                            label="Required (UI:R)"
-                            isChecked={formData.cvssVector.userInteraction === 'required'}
-                            onChange={(value) => handleCVSSChange('userInteraction', value)}
-                          />
-                        </HStack>
-                      </RadioGroup>
-                    </FormControl>
-                  </GridItem>
-                </Grid>
-
-                <Divider my={4} />
-
-                <Text fontWeight="bold" mb={4}>Impact Metrics</Text>
-                <Grid templateColumns="repeat(3, 1fr)" gap={6}>
-                  <GridItem>
-                    <FormControl>
-                      <FormLabel fontWeight="bold">Confidentiality Impact (C)</FormLabel>
-                      <RadioGroup
-                        value={formData.cvssVector.confidentialityImpact}
-                        onChange={(value) => handleCVSSChange('confidentialityImpact', value)}
-                      >
-                        <HStack spacing={2}>
-                          <RadioBox
-                            value="none"
-                            label="None (C:N)"
-                            isChecked={formData.cvssVector.confidentialityImpact === 'none'}
-                            onChange={(value) => handleCVSSChange('confidentialityImpact', value)}
-                          />
-                          <RadioBox
-                            value="low"
-                            label="Low (C:L)"
-                            isChecked={formData.cvssVector.confidentialityImpact === 'low'}
-                            onChange={(value) => handleCVSSChange('confidentialityImpact', value)}
-                          />
-                          <RadioBox
-                            value="high"
-                            label="High (C:H)"
-                            isChecked={formData.cvssVector.confidentialityImpact === 'high'}
-                            onChange={(value) => handleCVSSChange('confidentialityImpact', value)}
-                          />
-                        </HStack>
-                      </RadioGroup>
-                    </FormControl>
-                  </GridItem>
-                  <GridItem>
-                    <FormControl>
-                      <FormLabel fontWeight="bold">Integrity Impact (I)</FormLabel>
-                      <RadioGroup
-                        value={formData.cvssVector.integrityImpact}
-                        onChange={(value) => handleCVSSChange('integrityImpact', value)}
-                      >
-                        <HStack spacing={2}>
-                          <RadioBox
-                            value="none"
-                            label="None (I:N)"
-                            isChecked={formData.cvssVector.integrityImpact === 'none'}
-                            onChange={(value) => handleCVSSChange('integrityImpact', value)}
-                          />
-                          <RadioBox
-                            value="low"
-                            label="Low (I:L)"
-                            isChecked={formData.cvssVector.integrityImpact === 'low'}
-                            onChange={(value) => handleCVSSChange('integrityImpact', value)}
-                          />
-                          <RadioBox
-                            value="high"
-                            label="High (I:H)"
-                            isChecked={formData.cvssVector.integrityImpact === 'high'}
-                            onChange={(value) => handleCVSSChange('integrityImpact', value)}
-                          />
-                        </HStack>
-                      </RadioGroup>
-                    </FormControl>
-                  </GridItem>
-                  <GridItem>
-                    <FormControl>
-                      <FormLabel fontWeight="bold">Availability Impact (A)</FormLabel>
-                      <RadioGroup
-                        value={formData.cvssVector.availabilityImpact}
-                        onChange={(value) => handleCVSSChange('availabilityImpact', value)}
-                      >
-                        <HStack spacing={2}>
-                          <RadioBox
-                            value="none"
-                            label="None (A:N)"
-                            isChecked={formData.cvssVector.availabilityImpact === 'none'}
-                            onChange={(value) => handleCVSSChange('availabilityImpact', value)}
-                          />
-                          <RadioBox
-                            value="low"
-                            label="Low (A:L)"
-                            isChecked={formData.cvssVector.availabilityImpact === 'low'}
-                            onChange={(value) => handleCVSSChange('availabilityImpact', value)}
-                          />
-                          <RadioBox
-                            value="high"
-                            label="High (A:H)"
-                            isChecked={formData.cvssVector.availabilityImpact === 'high'}
-                            onChange={(value) => handleCVSSChange('availabilityImpact', value)}
-                          />
-                        </HStack>
-                      </RadioGroup>
-                    </FormControl>
-                  </GridItem>
-                </Grid>
-
-                <Divider my={4} />
-
-                <Box>
-                  <Button
-                    variant="ghost"
-                    onClick={onEnvironmentalToggle}
-                    mb={4}
-                    leftIcon={<Icon as={isEnvironmentalOpen ? FiChevronDown : FiChevronRight} />}
-                  >
-                    Environmental Score Metrics
-                  </Button>
-                  <Collapse in={isEnvironmentalOpen}>
-                    <Grid templateColumns="repeat(2, 1fr)" gap={6}>
-                      <GridItem>
-                        <FormControl>
-                          <FormLabel fontWeight="bold">Confidentiality Requirement (CR)</FormLabel>
-                          <RadioGroup
-                            value={formData.cvssVector.confidentialityRequirement}
-                            onChange={(value) => handleCVSSChange('confidentialityRequirement', value)}
-                          >
-                            <HStack spacing={2}>
-                              <RadioBox
-                                value="not-defined"
-                                label="Not Defined (CR:X)"
-                                isChecked={formData.cvssVector.confidentialityRequirement === 'not-defined'}
-                                onChange={(value) => handleCVSSChange('confidentialityRequirement', value)}
-                              />
-                              <RadioBox
-                                value="low"
-                                label="Low (CR:L)"
-                                isChecked={formData.cvssVector.confidentialityRequirement === 'low'}
-                                onChange={(value) => handleCVSSChange('confidentialityRequirement', value)}
-                              />
-                              <RadioBox
-                                value="medium"
-                                label="Medium (CR:M)"
-                                isChecked={formData.cvssVector.confidentialityRequirement === 'medium'}
-                                onChange={(value) => handleCVSSChange('confidentialityRequirement', value)}
-                              />
-                              <RadioBox
-                                value="high"
-                                label="High (CR:H)"
-                                isChecked={formData.cvssVector.confidentialityRequirement === 'high'}
-                                onChange={(value) => handleCVSSChange('confidentialityRequirement', value)}
-                              />
-                            </HStack>
-                          </RadioGroup>
-                        </FormControl>
-                      </GridItem>
-                      <GridItem>
-                        <FormControl>
-                          <FormLabel fontWeight="bold">Integrity Requirement (IR)</FormLabel>
-                          <RadioGroup
-                            value={formData.cvssVector.integrityRequirement}
-                            onChange={(value) => handleCVSSChange('integrityRequirement', value)}
-                          >
-                            <HStack spacing={2}>
-                              <RadioBox
-                                value="not-defined"
-                                label="Not Defined (IR:X)"
-                                isChecked={formData.cvssVector.integrityRequirement === 'not-defined'}
-                                onChange={(value) => handleCVSSChange('integrityRequirement', value)}
-                              />
-                              <RadioBox
-                                value="low"
-                                label="Low (IR:L)"
-                                isChecked={formData.cvssVector.integrityRequirement === 'low'}
-                                onChange={(value) => handleCVSSChange('integrityRequirement', value)}
-                              />
-                              <RadioBox
-                                value="medium"
-                                label="Medium (IR:M)"
-                                isChecked={formData.cvssVector.integrityRequirement === 'medium'}
-                                onChange={(value) => handleCVSSChange('integrityRequirement', value)}
-                              />
-                              <RadioBox
-                                value="high"
-                                label="High (IR:H)"
-                                isChecked={formData.cvssVector.integrityRequirement === 'high'}
-                                onChange={(value) => handleCVSSChange('integrityRequirement', value)}
-                              />
-                            </HStack>
-                          </RadioGroup>
-                        </FormControl>
-                      </GridItem>
-                      <GridItem>
-                        <FormControl>
-                          <FormLabel fontWeight="bold">Availability Requirement (AR)</FormLabel>
-                          <RadioGroup
-                            value={formData.cvssVector.availabilityRequirement}
-                            onChange={(value) => handleCVSSChange('availabilityRequirement', value)}
-                          >
-                            <HStack spacing={2}>
-                              <RadioBox
-                                value="not-defined"
-                                label="Not Defined (AR:X)"
-                                isChecked={formData.cvssVector.availabilityRequirement === 'not-defined'}
-                                onChange={(value) => handleCVSSChange('availabilityRequirement', value)}
-                              />
-                              <RadioBox
-                                value="low"
-                                label="Low (AR:L)"
-                                isChecked={formData.cvssVector.availabilityRequirement === 'low'}
-                                onChange={(value) => handleCVSSChange('availabilityRequirement', value)}
-                              />
-                              <RadioBox
-                                value="medium"
-                                label="Medium (AR:M)"
-                                isChecked={formData.cvssVector.availabilityRequirement === 'medium'}
-                                onChange={(value) => handleCVSSChange('availabilityRequirement', value)}
-                              />
-                              <RadioBox
-                                value="high"
-                                label="High (AR:H)"
-                                isChecked={formData.cvssVector.availabilityRequirement === 'high'}
-                                onChange={(value) => handleCVSSChange('availabilityRequirement', value)}
-                              />
-                            </HStack>
-                          </RadioGroup>
-                        </FormControl>
-                      </GridItem>
-                    </Grid>
-                  </Collapse>
-                </Box>
-
-                <Divider my={4} />
-
-                <Box>
-                  <Button
-                    variant="ghost"
-                    onClick={onTemporalToggle}
-                    mb={4}
-                    leftIcon={<Icon as={isTemporalOpen ? FiChevronDown : FiChevronRight} />}
-                  >
-                    Temporal Score Metrics
-                  </Button>
-                  <Collapse in={isTemporalOpen}>
-                    <Grid templateColumns="repeat(3, 1fr)" gap={6}>
-                      <GridItem>
-                        <FormControl>
-                          <FormLabel fontWeight="bold">Exploit Code Maturity (E)</FormLabel>
-                          <RadioGroup
-                            value={formData.cvssVector.exploitCodeMaturity}
-                            onChange={(value) => handleCVSSChange('exploitCodeMaturity', value)}
-                          >
-                            <HStack spacing={2}>
-                              <RadioBox
-                                value="not-defined"
-                                label="Not Defined (E:X)"
-                                isChecked={formData.cvssVector.exploitCodeMaturity === 'not-defined'}
-                                onChange={(value) => handleCVSSChange('exploitCodeMaturity', value)}
-                              />
-                              <RadioBox
-                                value="unproven"
-                                label="Unproven (E:U)"
-                                isChecked={formData.cvssVector.exploitCodeMaturity === 'unproven'}
-                                onChange={(value) => handleCVSSChange('exploitCodeMaturity', value)}
-                              />
-                              <RadioBox
-                                value="proof-of-concept"
-                                label="POC (E:P)"
-                                isChecked={formData.cvssVector.exploitCodeMaturity === 'proof-of-concept'}
-                                onChange={(value) => handleCVSSChange('exploitCodeMaturity', value)}
-                              />
-                              <RadioBox
-                                value="functional"
-                                label="Functional (E:F)"
-                                isChecked={formData.cvssVector.exploitCodeMaturity === 'functional'}
-                                onChange={(value) => handleCVSSChange('exploitCodeMaturity', value)}
-                              />
-                              <RadioBox
-                                value="high"
-                                label="High (E:H)"
-                                isChecked={formData.cvssVector.exploitCodeMaturity === 'high'}
-                                onChange={(value) => handleCVSSChange('exploitCodeMaturity', value)}
-                              />
-                            </HStack>
-                          </RadioGroup>
-                        </FormControl>
-                      </GridItem>
-                      <GridItem>
-                        <FormControl>
-                          <FormLabel fontWeight="bold">Remediation Level (RL)</FormLabel>
-                          <RadioGroup
-                            value={formData.cvssVector.remediationLevel}
-                            onChange={(value) => handleCVSSChange('remediationLevel', value)}
-                          >
-                            <HStack spacing={2}>
-                              <RadioBox
-                                value="not-defined"
-                                label="Not Defined (RL:X)"
-                                isChecked={formData.cvssVector.remediationLevel === 'not-defined'}
-                                onChange={(value) => handleCVSSChange('remediationLevel', value)}
-                              />
-                              <RadioBox
-                                value="official-fix"
-                                label="Official (RL:O)"
-                                isChecked={formData.cvssVector.remediationLevel === 'official-fix'}
-                                onChange={(value) => handleCVSSChange('remediationLevel', value)}
-                              />
-                              <RadioBox
-                                value="temporary-fix"
-                                label="Temporary (RL:T)"
-                                isChecked={formData.cvssVector.remediationLevel === 'temporary-fix'}
-                                onChange={(value) => handleCVSSChange('remediationLevel', value)}
-                              />
-                              <RadioBox
-                                value="workaround"
-                                label="Workaround (RL:W)"
-                                isChecked={formData.cvssVector.remediationLevel === 'workaround'}
-                                onChange={(value) => handleCVSSChange('remediationLevel', value)}
-                              />
-                              <RadioBox
-                                value="unavailable"
-                                label="Unavailable (RL:U)"
-                                isChecked={formData.cvssVector.remediationLevel === 'unavailable'}
-                                onChange={(value) => handleCVSSChange('remediationLevel', value)}
-                              />
-                            </HStack>
-                          </RadioGroup>
-                        </FormControl>
-                      </GridItem>
-                      <GridItem>
-                        <FormControl>
-                          <FormLabel fontWeight="bold">Report Confidence (RC)</FormLabel>
-                          <RadioGroup
-                            value={formData.cvssVector.reportConfidence}
-                            onChange={(value) => handleCVSSChange('reportConfidence', value)}
-                          >
-                            <HStack spacing={2}>
-                              <RadioBox
-                                value="not-defined"
-                                label="Not Defined (RC:X)"
-                                isChecked={formData.cvssVector.reportConfidence === 'not-defined'}
-                                onChange={(value) => handleCVSSChange('reportConfidence', value)}
-                              />
-                              <RadioBox
-                                value="unknown"
-                                label="Unknown (RC:U)"
-                                isChecked={formData.cvssVector.reportConfidence === 'unknown'}
-                                onChange={(value) => handleCVSSChange('reportConfidence', value)}
-                              />
-                              <RadioBox
-                                value="reasonable"
-                                label="Reasonable (RC:R)"
-                                isChecked={formData.cvssVector.reportConfidence === 'reasonable'}
-                                onChange={(value) => handleCVSSChange('reportConfidence', value)}
-                              />
-                              <RadioBox
-                                value="confirmed"
-                                label="Confirmed (RC:C)"
-                                isChecked={formData.cvssVector.reportConfidence === 'confirmed'}
-                                onChange={(value) => handleCVSSChange('reportConfidence', value)}
-                              />
-                            </HStack>
-                          </RadioGroup>
-                        </FormControl>
-                      </GridItem>
-                    </Grid>
-                  </Collapse>
-                </Box>
-              </Box>
-
-              <FormControl>
-                <FormLabel>Affected Assets</FormLabel>
-                <Textarea
-                  name="affectedAssets"
-                  value={formData.affectedAssets}
-                  onChange={(e) => handleChange('affectedAssets', e.target.value)}
-                  placeholder="Enter affected assets"
-                />
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>Steps to Reproduce</FormLabel>
-                <Textarea
-                  name="stepsToReproduce"
-                  value={formData.stepsToReproduce}
-                  onChange={(e) => handleChange('stepsToReproduce', e.target.value)}
-                  placeholder="Enter steps to reproduce"
-                  minH="200px"
-                />
-              </FormControl>
-            </VStack>
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
-    </VStack>
+      </VStack>
+    </Box>
   );
 };
 
