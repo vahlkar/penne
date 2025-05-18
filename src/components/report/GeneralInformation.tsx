@@ -109,7 +109,7 @@ export const GeneralInformation: React.FC<GeneralInformationProps> = ({
         <FormControl isRequired>
           <FormLabel>Date Generated</FormLabel>
           <Input
-            type="date"
+            type="datetime-local"
             value={formData.report_metadata.date_generated}
             onChange={(e) => handleChange('report_metadata', {
               ...formData.report_metadata,
@@ -121,7 +121,7 @@ export const GeneralInformation: React.FC<GeneralInformationProps> = ({
         <FormControl isRequired>
           <FormLabel>Testing Period Start</FormLabel>
           <Input
-            type="date"
+            type="datetime-local"
             value={formData.report_metadata.date_of_testing.start}
             onChange={(e) => handleChange('report_metadata', {
               ...formData.report_metadata,
@@ -136,7 +136,7 @@ export const GeneralInformation: React.FC<GeneralInformationProps> = ({
         <FormControl isRequired>
           <FormLabel>Testing Period End</FormLabel>
           <Input
-            type="date"
+            type="datetime-local"
             value={formData.report_metadata.date_of_testing.end}
             onChange={(e) => handleChange('report_metadata', {
               ...formData.report_metadata,

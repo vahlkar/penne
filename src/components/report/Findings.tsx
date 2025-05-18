@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -22,6 +22,8 @@ import type { Finding } from '../../utils/db';
 interface FindingsProps {
   findings: Finding[];
   onFindingsChange: (findings: Finding[]) => void;
+  onSave: (findings: Finding[]) => Promise<void>;
+  onDirtyChange: (isDirty: boolean) => void;
 }
 
 type Severity = 'informational' | 'low' | 'medium' | 'high' | 'critical';
@@ -43,10 +45,55 @@ const getSeverityColor = (severity: Severity): string => {
   }
 };
 
-export const Findings: React.FC<FindingsProps> = ({ findings, onFindingsChange }) => {
-  const [formData, setFormData] = useState<Finding[]>(findings);
+const getSeverityWeight = (severity: Severity): number => {
+  switch (severity) {
+    case 'critical':
+      return 4;
+    case 'high':
+      return 3;
+    case 'medium':
+      return 2;
+    case 'low':
+      return 1;
+    case 'informational':
+      return 0;
+    default:
+      return -1;
+  }
+};
+
+const sortFindings = (findings: Finding[]): Finding[] => {
+  return [...findings].sort((a, b) => {
+    // First sort by severity
+    const severityA = getSeverityWeight(a.severity as Severity);
+    const severityB = getSeverityWeight(b.severity as Severity);
+    if (severityA !== severityB) {
+      return severityB - severityA; // Higher severity first
+    }
+
+    // Then by CVSS score
+    if (a.cvss_score !== b.cvss_score) {
+      return b.cvss_score - a.cvss_score; // Higher score first
+    }
+
+    // Finally by title
+    return a.title.localeCompare(b.title);
+  });
+};
+
+export const Findings: React.FC<FindingsProps> = ({ 
+  findings, 
+  onFindingsChange,
+  onSave,
+  onDirtyChange 
+}) => {
+  const [formData, setFormData] = useState<Finding[]>(sortFindings(findings));
   const [editingFinding, setEditingFinding] = useState<number | null>(null);
   const toast = useToast();
+
+  useEffect(() => {
+    setFormData(sortFindings(findings));
+  }, [findings]);
 
   const handleFindingChange = (index: number, field: keyof Finding, value: any) => {
     const newFindings = [...formData];
@@ -54,8 +101,10 @@ export const Findings: React.FC<FindingsProps> = ({ findings, onFindingsChange }
       ...newFindings[index],
       [field]: value,
     };
-    setFormData(newFindings);
-    onFindingsChange(newFindings);
+    const sortedFindings = sortFindings(newFindings);
+    setFormData(sortedFindings);
+    onFindingsChange(sortedFindings);
+    onDirtyChange(true);
   };
 
   const handleAddFinding = () => {
@@ -74,24 +123,38 @@ export const Findings: React.FC<FindingsProps> = ({ findings, onFindingsChange }
       recommendations: [],
       status: 'unresolved',
     };
-    setFormData([...formData, newFinding]);
-    onFindingsChange([...formData, newFinding]);
+    const newFindings = sortFindings([...formData, newFinding]);
+    setFormData(newFindings);
+    onFindingsChange(newFindings);
+    onDirtyChange(true);
   };
 
   const handleRemoveFinding = (index: number) => {
-    const newFindings = formData.filter((_, i) => i !== index);
+    const newFindings = sortFindings(formData.filter((_, i) => i !== index));
     setFormData(newFindings);
     onFindingsChange(newFindings);
+    onDirtyChange(true);
   };
 
-  const handleSave = () => {
-    onFindingsChange(formData);
-    toast({
-      title: 'Findings saved',
-      status: 'success',
-      duration: 3000,
-      isClosable: true,
-    });
+  const handleSave = async () => {
+    try {
+      await onSave(formData);
+      onDirtyChange(false);
+      toast({
+        title: 'Findings saved',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to save findings',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
   };
 
   return (

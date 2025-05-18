@@ -18,19 +18,19 @@ import {
 interface NewReportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: { name: string; assessmentType: string; tester: string }) => void;
+  onSubmit: (data: { clientName: string; engagementName: string; engagementId: string }) => void;
 }
 
 const NewReportModal: React.FC<NewReportModalProps> = ({ isOpen, onClose, onSubmit }) => {
-  const [name, setName] = useState('');
-  const [assessmentType, setAssessmentType] = useState('');
-  const [tester, setTester] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [engagementName, setEngagementName] = useState('');
+  const [engagementId, setEngagementId] = useState('');
 
   const handleSubmit = () => {
-    onSubmit({ name, assessmentType, tester });
-    setName('');
-    setAssessmentType('');
-    setTester('');
+    onSubmit({ clientName, engagementName, engagementId });
+    setClientName('');
+    setEngagementName('');
+    setEngagementId('');
     onClose();
   };
 
@@ -43,33 +43,27 @@ const NewReportModal: React.FC<NewReportModalProps> = ({ isOpen, onClose, onSubm
         <ModalBody>
           <VStack spacing={4}>
             <FormControl isRequired>
-              <FormLabel>Name</FormLabel>
+              <FormLabel>Client Name</FormLabel>
               <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Enter report name"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                placeholder="Enter client name"
               />
             </FormControl>
             <FormControl isRequired>
-              <FormLabel>Assessment Type</FormLabel>
-              <Select
-                value={assessmentType}
-                onChange={(e) => setAssessmentType(e.target.value)}
-                placeholder="Select assessment type"
-              >
-                <option value="Web Application">Web Application</option>
-                <option value="Mobile Application">Mobile Application</option>
-                <option value="Network">Network</option>
-                <option value="API">API</option>
-                <option value="Social Engineering">Social Engineering</option>
-              </Select>
-            </FormControl>
-            <FormControl isRequired>
-              <FormLabel>Tester</FormLabel>
+              <FormLabel>Engagement Name</FormLabel>
               <Input
-                value={tester}
-                onChange={(e) => setTester(e.target.value)}
-                placeholder="Enter tester name"
+                value={engagementName}
+                onChange={(e) => setEngagementName(e.target.value)}
+                placeholder="Enter engagement name"
+              />
+            </FormControl>
+            <FormControl>
+              <FormLabel>Engagement ID</FormLabel>
+              <Input
+                value={engagementId}
+                onChange={(e) => setEngagementId(e.target.value)}
+                placeholder="Enter engagement ID (optional)"
               />
             </FormControl>
           </VStack>
@@ -81,7 +75,7 @@ const NewReportModal: React.FC<NewReportModalProps> = ({ isOpen, onClose, onSubm
           <Button
             colorScheme="blue"
             onClick={handleSubmit}
-            isDisabled={!name || !assessmentType || !tester}
+            isDisabled={!clientName || !engagementName}
           >
             Create
           </Button>

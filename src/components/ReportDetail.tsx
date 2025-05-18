@@ -245,6 +245,11 @@ const ReportDetail: React.FC = () => {
                   setIsDirty(true);
                   setCurrentFormData(updatedReport);
                 }}
+                onSave={async (newFindings: Finding[]) => {
+                  const updatedReport = { ...report, findings: newFindings };
+                  await handleSaveReport(updatedReport);
+                }}
+                onDirtyChange={setIsDirty}
               />
             } />
             <Route path="/artefacts" element={

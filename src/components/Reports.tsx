@@ -138,14 +138,14 @@ const Reports: React.FC = () => {
     }
   };
 
-  const handleNewReport = async (data: { name: string; assessmentType: string; tester: string }) => {
+  const handleNewReport = async (data: { clientName: string; engagementName: string; engagementId: string }) => {
     try {
       const newReport = await addReport({
         report_metadata: {
           report_id: crypto.randomUUID(),
-          client_name: data.name,
-          engagement_name: data.assessmentType,
-          engagement_id: '',
+          client_name: data.clientName,
+          engagement_name: data.engagementName,
+          engagement_id: data.engagementId,
           date_generated: new Date().toISOString(),
           date_of_testing: { start: '', end: '' },
           tester_info: { company: '', team: [] },
@@ -215,7 +215,7 @@ const Reports: React.FC = () => {
   };
 
   const handleEditClick = (reportId: string) => {
-    navigate(`/report/${reportId}`);
+    navigate(`/report/${reportId}/metadata`);
   };
 
   return (
@@ -244,9 +244,9 @@ const Reports: React.FC = () => {
             <Tr>
               <Th>
                 <Flex align="center">
-                  Name
+                  Client Name
                   <IconButton
-                    aria-label="Sort by name"
+                    aria-label="Sort by client name"
                     icon={sortField === 'client_name' ? (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />) : <ChevronUpIcon />}
                     size="xs"
                     variant="ghost"
@@ -257,16 +257,16 @@ const Reports: React.FC = () => {
                 <Input 
                   size="sm" 
                   mt={2} 
-                  placeholder="Filter name..." 
+                  placeholder="Filter client..." 
                   value={nameFilter}
                   onChange={(e) => setNameFilter(e.target.value)}
                 />
               </Th>
               <Th>
                 <Flex align="center">
-                  Assessment Type
+                  Engagement Name
                   <IconButton
-                    aria-label="Sort by type"
+                    aria-label="Sort by engagement name"
                     icon={sortField === 'engagement_name' ? (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />) : <ChevronUpIcon />}
                     size="xs"
                     variant="ghost"
@@ -277,27 +277,27 @@ const Reports: React.FC = () => {
                 <Input 
                   size="sm" 
                   mt={2} 
-                  placeholder="Filter type..." 
+                  placeholder="Filter engagement..." 
                   value={typeFilter}
                   onChange={(e) => setTypeFilter(e.target.value)}
                 />
               </Th>
               <Th>
                 <Flex align="center">
-                  Tester
+                  Engagement ID
                   <IconButton
-                    aria-label="Sort by tester"
-                    icon={sortField === 'date_generated' ? (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />) : <ChevronUpIcon />}
+                    aria-label="Sort by engagement ID"
+                    icon={sortField === 'engagement_id' ? (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />) : <ChevronUpIcon />}
                     size="xs"
                     variant="ghost"
                     ml={2}
-                    onClick={() => handleSort('date_generated')}
+                    onClick={() => handleSort('engagement_id')}
                   />
                 </Flex>
                 <Input 
                   size="sm" 
                   mt={2} 
-                  placeholder="Filter tester..." 
+                  placeholder="Filter ID..." 
                   value={testerFilter}
                   onChange={(e) => setTesterFilter(e.target.value)}
                 />
@@ -330,6 +330,7 @@ const Reports: React.FC = () => {
               <Tr key={report.id}>
                 <Td>{report.report_metadata.client_name}</Td>
                 <Td>{report.report_metadata.engagement_name}</Td>
+                <Td>{report.report_metadata.engagement_id || '-'}</Td>
                 <Td>{report.report_metadata.date_generated}</Td>
                 <Td>
                   <HStack spacing={2}>
