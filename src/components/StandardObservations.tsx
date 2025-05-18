@@ -59,14 +59,12 @@ interface ObservationFormData {
   cvss_score: number;
   cvss_vector?: string;
   summary: string;
-  affected_assets: string[];
   technical_details: {
     impact: string;
     testing_process: string;
   };
   recommendations: string[];
   references?: string[];
-  status: 'resolved' | 'unresolved' | 'accepted_risk' | 'false_positive';
 }
 
 const initialFormData: ObservationFormData = {
@@ -74,18 +72,16 @@ const initialFormData: ObservationFormData = {
   severity: 'low',
   cvss_score: 0,
   summary: '',
-  affected_assets: [],
   technical_details: {
     impact: '',
     testing_process: '',
   },
   recommendations: [],
-  status: 'unresolved',
 };
 
 const StandardObservations: React.FC = () => {
-  const [observations, setObservations] = useState<Finding[]>([]);
-  const [selectedObservation, setSelectedObservation] = useState<Finding | null>(null);
+  const [observations, setObservations] = useState<Omit<Finding, 'status' | 'affected_assets' | 'report_id'>[]>([]);
+  const [selectedObservation, setSelectedObservation] = useState<Omit<Finding, 'status' | 'affected_assets' | 'report_id'> | null>(null);
   const [formData, setFormData] = useState<ObservationFormData>(initialFormData);
   const [isEditing, setIsEditing] = useState(false);
   const toast = useToast();
@@ -95,12 +91,9 @@ const StandardObservations: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [severityFilter, setSeverityFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
   const [sortField, setSortField] = useState<string>('severity');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [filteredObservations, setFilteredObservations] = useState<Finding[]>([]);
-  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<Finding | null>(null);
+  const [filteredObservations, setFilteredObservations] = useState<Omit<Finding, 'status' | 'affected_assets' | 'report_id'>[]>([]);
 
   useEffect(() => {
     loadObservations();
@@ -125,11 +118,6 @@ const StandardObservations: React.FC = () => {
       result = result.filter(obs => obs.severity === severityFilter);
     }
 
-    // Apply status filter
-    if (statusFilter) {
-      result = result.filter(obs => obs.status === statusFilter);
-    }
-
     // Apply sorting
     result.sort((a, b) => {
       let comparison = 0;
@@ -144,9 +132,6 @@ const StandardObservations: React.FC = () => {
         case 'title':
           comparison = a.title.localeCompare(b.title);
           break;
-        case 'status':
-          comparison = a.status.localeCompare(b.status);
-          break;
         default:
           comparison = 0;
       }
@@ -154,12 +139,12 @@ const StandardObservations: React.FC = () => {
     });
 
     setFilteredObservations(result);
-  }, [observations, searchQuery, severityFilter, statusFilter, sortField, sortDirection]);
+  }, [observations, searchQuery, severityFilter, sortField, sortDirection]);
 
   const loadObservations = async () => {
     try {
       const data = await getAllStandardObservations();
-      setObservations(data);
+      setObservations(data as Omit<Finding, 'status' | 'affected_assets' | 'report_id'>[]);
     } catch (error) {
       console.error('Failed to load standard observations:', error);
       toast({
@@ -231,7 +216,7 @@ const StandardObservations: React.FC = () => {
     }
   };
 
-  const handleEdit = (observation: Finding) => {
+  const handleEdit = (observation: Omit<Finding, 'status' | 'affected_assets' | 'report_id'>) => {
     setSelectedObservation(observation);
     setFormData({
       title: observation.title,
@@ -239,11 +224,9 @@ const StandardObservations: React.FC = () => {
       cvss_score: observation.cvss_score,
       cvss_vector: observation.cvss_vector,
       summary: observation.summary,
-      affected_assets: observation.affected_assets,
       technical_details: observation.technical_details,
       recommendations: observation.recommendations,
       references: observation.references,
-      status: observation.status,
     });
     setIsEditing(true);
     onFormOpen();
@@ -330,45 +313,6 @@ const StandardObservations: React.FC = () => {
     }
   };
 
-  const handleUseAsTemplate = (observation: Finding) => {
-    setSelectedTemplate(observation);
-    setIsTemplateModalOpen(true);
-  };
-
-  const handleTemplateConfirm = async () => {
-    if (!selectedTemplate) return;
-
-    try {
-      const newObservation = {
-        ...selectedTemplate,
-        id: crypto.randomUUID(),
-        title: `${selectedTemplate.title} (Copy)`,
-        status: 'unresolved',
-      };
-      await addStandardObservation(newObservation);
-      await loadObservations();
-      toast({
-        title: 'Template applied',
-        description: 'New observation created from template',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-    } catch (error) {
-      console.error('Failed to create observation from template:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to create observation from template',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    } finally {
-      setIsTemplateModalOpen(false);
-      setSelectedTemplate(null);
-    }
-  };
-
   return (
     <Container maxW="container.xl" pt={20}>
       <VStack spacing={6} align="stretch">
@@ -423,18 +367,6 @@ const StandardObservations: React.FC = () => {
               <option value="low">Low</option>
               <option value="informational">Informational</option>
             </Select>
-            <Select
-              placeholder="Filter by status"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              maxW="200px"
-            >
-              <option value="">All Statuses</option>
-              <option value="unresolved">Unresolved</option>
-              <option value="resolved">Resolved</option>
-              <option value="accepted_risk">Accepted Risk</option>
-              <option value="false_positive">False Positive</option>
-            </Select>
             <Popover placement="bottom-end">
               <PopoverTrigger>
                 <IconButton
@@ -454,7 +386,6 @@ const StandardObservations: React.FC = () => {
                       <option value="severity">Severity</option>
                       <option value="cvss_score">CVSS Score</option>
                       <option value="title">Title</option>
-                      <option value="status">Status</option>
                     </Select>
                     <HStack justify="space-between">
                       <Text>Direction</Text>
@@ -486,7 +417,6 @@ const StandardObservations: React.FC = () => {
               <Th>Title</Th>
               <Th>Severity</Th>
               <Th>CVSS Score</Th>
-              <Th>Status</Th>
               <Th>Actions</Th>
             </Tr>
           </Thead>
@@ -501,18 +431,7 @@ const StandardObservations: React.FC = () => {
                 </Td>
                 <Td>{observation.cvss_score}</Td>
                 <Td>
-                  <Badge colorScheme={observation.status === 'resolved' ? 'green' : 'yellow'}>
-                    {observation.status}
-                  </Badge>
-                </Td>
-                <Td>
                   <HStack spacing={2}>
-                    <IconButton
-                      aria-label="Use as template"
-                      icon={<FiCopy />}
-                      size="sm"
-                      onClick={() => handleUseAsTemplate(observation)}
-                    />
                     <IconButton
                       aria-label="Edit observation"
                       icon={<FiEdit2 />}
@@ -684,19 +603,6 @@ const StandardObservations: React.FC = () => {
                     placeholder="Enter each reference URL on a new line"
                   />
                 </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Status</FormLabel>
-                  <Select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                  >
-                    <option value="unresolved">Unresolved</option>
-                    <option value="resolved">Resolved</option>
-                    <option value="accepted_risk">Accepted Risk</option>
-                    <option value="false_positive">False Positive</option>
-                  </Select>
-                </FormControl>
               </VStack>
             </ModalBody>
 
@@ -706,29 +612,6 @@ const StandardObservations: React.FC = () => {
               </Button>
               <Button colorScheme="blue" onClick={handleFormSubmit}>
                 {isEditing ? 'Update' : 'Create'}
-              </Button>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
-
-        {/* Template Confirmation Modal */}
-        <Modal isOpen={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)}>
-          <ModalOverlay />
-          <ModalContent>
-            <ModalHeader>Use as Template</ModalHeader>
-            <ModalCloseButton />
-            <ModalBody>
-              <Text>Do you want to create a new observation based on this template?</Text>
-              <Text mt={2} fontWeight="bold">
-                {selectedTemplate?.title}
-              </Text>
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="ghost" mr={3} onClick={() => setIsTemplateModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button colorScheme="blue" onClick={handleTemplateConfirm}>
-                Create from Template
               </Button>
             </ModalFooter>
           </ModalContent>

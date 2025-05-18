@@ -101,10 +101,9 @@ interface PentestReportsDB extends DBSchema {
   };
   standard_observations: {
     key: string;
-    value: Finding;
+    value: Omit<Finding, 'status' | 'affected_assets' | 'report_id'>;
     indexes: {
       'by-severity': string;
-      'by-status': string;
     };
   };
 }
@@ -126,7 +125,6 @@ export const initDB = async (): Promise<void> => {
       if (oldVersion < 4) {
         const observationsStore = db.createObjectStore('standard_observations', { keyPath: 'id' });
         observationsStore.createIndex('by-severity', 'severity');
-        observationsStore.createIndex('by-status', 'status');
       }
     },
   });
@@ -186,28 +184,27 @@ export const getReportsByDateRange = async (startDate: string, endDate: string):
 };
 
 // Standard Observations CRUD operations
-export const addStandardObservation = async (observation: Omit<Finding, 'id' | 'report_id'>): Promise<Finding> => {
+export const addStandardObservation = async (observation: Omit<Finding, 'id' | 'report_id' | 'status' | 'affected_assets'>): Promise<Omit<Finding, 'status' | 'affected_assets' | 'report_id'>> => {
   const db = await dbPromise;
-  const newObservation: Finding = {
+  const newObservation = {
     ...observation,
     id: crypto.randomUUID(),
-    report_id: 'standard', // Special identifier for standard observations
   };
   await db.add('standard_observations', newObservation);
   return newObservation;
 };
 
-export const updateStandardObservation = async (observation: Finding): Promise<void> => {
+export const updateStandardObservation = async (observation: Omit<Finding, 'status' | 'affected_assets' | 'report_id'>): Promise<void> => {
   const db = await dbPromise;
   await db.put('standard_observations', observation);
 };
 
-export const getAllStandardObservations = async (): Promise<Finding[]> => {
+export const getAllStandardObservations = async (): Promise<Omit<Finding, 'status' | 'affected_assets' | 'report_id'>[]> => {
   const db = await dbPromise;
   return db.getAll('standard_observations');
 };
 
-export const getStandardObservation = async (id: string): Promise<Finding | undefined> => {
+export const getStandardObservation = async (id: string): Promise<Omit<Finding, 'status' | 'affected_assets' | 'report_id'> | undefined> => {
   const db = await dbPromise;
   return db.get('standard_observations', id);
 };
@@ -217,16 +214,9 @@ export const deleteStandardObservation = async (id: string): Promise<void> => {
   await db.delete('standard_observations', id);
 };
 
-export const getStandardObservationsBySeverity = async (severity: string): Promise<Finding[]> => {
+export const getStandardObservationsBySeverity = async (severity: string): Promise<Omit<Finding, 'status' | 'affected_assets' | 'report_id'>[]> => {
   const db = await dbPromise;
   const tx = db.transaction('standard_observations', 'readonly');
   const index = tx.store.index('by-severity');
   return index.getAll(severity);
-};
-
-export const getStandardObservationsByStatus = async (status: string): Promise<Finding[]> => {
-  const db = await dbPromise;
-  const tx = db.transaction('standard_observations', 'readonly');
-  const index = tx.store.index('by-status');
-  return index.getAll(status);
 }; 

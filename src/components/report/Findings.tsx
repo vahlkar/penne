@@ -16,8 +16,20 @@ import {
   AccordionPanel,
   AccordionIcon,
   useToast,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ModalCloseButton,
+  InputGroup,
+  InputLeftElement,
+  Text,
 } from '@chakra-ui/react';
+import { FiSearch, FiPlus } from 'react-icons/fi';
 import type { Finding } from '../../utils/db';
+import { getAllStandardObservations } from '../../utils/db';
 
 interface FindingsProps {
   findings: Finding[];
@@ -27,23 +39,6 @@ interface FindingsProps {
 }
 
 type Severity = 'informational' | 'low' | 'medium' | 'high' | 'critical';
-
-const getSeverityColor = (severity: Severity): string => {
-  switch (severity) {
-    case 'critical':
-      return 'red';
-    case 'high':
-      return 'orange';
-    case 'medium':
-      return 'yellow';
-    case 'low':
-      return 'green';
-    case 'informational':
-      return 'blue';
-    default:
-      return 'gray';
-  }
-};
 
 const getSeverityWeight = (severity: Severity): number => {
   switch (severity) {
@@ -57,8 +52,21 @@ const getSeverityWeight = (severity: Severity): number => {
       return 1;
     case 'informational':
       return 0;
+  }
+};
+
+const getSeverityColor = (severity: string) => {
+  switch (severity) {
+    case 'critical':
+      return 'red';
+    case 'high':
+      return 'orange';
+    case 'medium':
+      return 'yellow';
+    case 'low':
+      return 'green';
     default:
-      return -1;
+      return 'gray';
   }
 };
 
@@ -90,10 +98,47 @@ export const Findings: React.FC<FindingsProps> = ({
   const [formData, setFormData] = useState<Finding[]>(sortFindings(findings));
   const [editingFinding, setEditingFinding] = useState<number | null>(null);
   const toast = useToast();
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [templates, setTemplates] = useState<Omit<Finding, 'status' | 'affected_assets' | 'report_id'>[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredTemplates, setFilteredTemplates] = useState<Omit<Finding, 'status' | 'affected_assets' | 'report_id'>[]>([]);
 
   useEffect(() => {
     setFormData(sortFindings(findings));
   }, [findings]);
+
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  useEffect(() => {
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      setFilteredTemplates(templates.filter(template => 
+        template.title.toLowerCase().includes(query) ||
+        template.summary.toLowerCase().includes(query)
+      ));
+    } else {
+      setFilteredTemplates(templates);
+    }
+  }, [searchQuery, templates]);
+
+  const loadTemplates = async () => {
+    try {
+      const data = await getAllStandardObservations();
+      setTemplates(data);
+      setFilteredTemplates(data);
+    } catch (error) {
+      console.error('Failed to load templates:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load templates',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
 
   const handleFindingChange = (index: number, field: keyof Finding, value: any) => {
     const newFindings = [...formData];
@@ -129,6 +174,21 @@ export const Findings: React.FC<FindingsProps> = ({
     onDirtyChange(true);
   };
 
+  const handleAddFromTemplate = (template: Omit<Finding, 'status' | 'affected_assets' | 'report_id'>) => {
+    const newFinding: Finding = {
+      ...template,
+      id: crypto.randomUUID(),
+      report_id: '', // This should be set by the parent component
+      affected_assets: [],
+      status: 'unresolved',
+    };
+    const newFindings = sortFindings([...formData, newFinding]);
+    setFormData(newFindings);
+    onFindingsChange(newFindings);
+    onDirtyChange(true);
+    setIsTemplateModalOpen(false);
+  };
+
   const handleRemoveFinding = (index: number) => {
     const newFindings = sortFindings(formData.filter((_, i) => i !== index));
     setFormData(newFindings);
@@ -160,6 +220,18 @@ export const Findings: React.FC<FindingsProps> = ({
   return (
     <Box>
       <VStack spacing={4} align="stretch">
+        <HStack spacing={4}>
+          <Button colorScheme="blue" onClick={handleAddFinding}>
+            Add Empty Finding
+          </Button>
+          <Button colorScheme="green" onClick={() => setIsTemplateModalOpen(true)}>
+            Add from Template
+          </Button>
+          <Button colorScheme="green" onClick={handleSave}>
+            Save All Changes
+          </Button>
+        </HStack>
+
         <Accordion allowMultiple>
           {formData.map((finding, index) => (
             <AccordionItem key={finding.id}>
@@ -291,14 +363,55 @@ export const Findings: React.FC<FindingsProps> = ({
           ))}
         </Accordion>
 
-        <HStack spacing={4}>
-          <Button colorScheme="blue" onClick={handleAddFinding}>
-            Add Finding
-          </Button>
-          <Button colorScheme="green" onClick={handleSave}>
-            Save All Changes
-          </Button>
-        </HStack>
+        {/* Template Selection Modal */}
+        <Modal isOpen={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} size="xl">
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Select Template</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <VStack spacing={4} align="stretch">
+                <InputGroup>
+                  <InputLeftElement pointerEvents="none">
+                    <FiSearch color="gray.300" />
+                  </InputLeftElement>
+                  <Input
+                    placeholder="Search templates..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </InputGroup>
+
+                {filteredTemplates.map((template) => (
+                  <Box
+                    key={template.id}
+                    p={4}
+                    borderWidth="1px"
+                    borderRadius="md"
+                    cursor="pointer"
+                    _hover={{ bg: 'gray.50' }}
+                    onClick={() => handleAddFromTemplate(template)}
+                  >
+                    <VStack align="stretch" spacing={2}>
+                      <HStack>
+                        <Badge colorScheme={getSeverityColor(template.severity)}>
+                          {template.severity.toUpperCase()}
+                        </Badge>
+                        <Text fontWeight="bold">{template.title}</Text>
+                      </HStack>
+                      <Text noOfLines={2}>{template.summary}</Text>
+                    </VStack>
+                  </Box>
+                ))}
+              </VStack>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" mr={3} onClick={() => setIsTemplateModalOpen(false)}>
+                Cancel
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
       </VStack>
     </Box>
   );
